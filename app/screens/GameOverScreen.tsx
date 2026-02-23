@@ -1,10 +1,19 @@
+import PrimaryButton from "@/components/ui/PrimaryButton";
 import Title from "@/components/ui/Title";
 import Colors from "@/constants/colors";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import SuccessImage from "../../assets/images/success.svg";
 
-export default function GameOverScreen() {
+export default function GameOverScreen({
+  roundsNumber,
+  userNumber,
+  onStartGame,
+}: {
+  roundsNumber: number;
+  userNumber: number;
+  onStartGame: () => void;
+}) {
   return (
     <View style={styles.rootContainer}>
       <Title>GAME OVER!</Title>
@@ -12,7 +21,12 @@ export default function GameOverScreen() {
         <SuccessImage width={300} height={300} />
       </View>
       <View>
-        <Text>Your phone needed X rounds to guess the number Y.</Text>
+        <Text style={styles.summaryText}>
+          Your phone needed <Text style={styles.Highlight}>{roundsNumber}</Text>{" "}
+          rounds to guess the number{" "}
+          <Text style={styles.Highlight}>{userNumber}</Text>.
+        </Text>
+        <PrimaryButton onPress={onStartGame}>Start New Game</PrimaryButton>
       </View>
     </View>
   );
@@ -33,5 +47,15 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary800,
     overflow: "hidden",
     marginVertical: 36,
+  },
+  summaryText: {
+    fontFamily: "play-fair",
+    fontSize: 24,
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  Highlight: {
+    fontFamily: "play-fair-bold",
+    color: Colors.primary500,
   },
 });
