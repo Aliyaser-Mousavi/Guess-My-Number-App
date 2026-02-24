@@ -2,6 +2,7 @@ import Colors from "@/constants/colors";
 import { useFonts } from "expo-font";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
 import { useCallback, useState } from "react";
 import { ImageBackground, StyleSheet } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
@@ -66,23 +67,26 @@ export default function Index() {
   }
 
   return (
-    <LinearGradient
-      style={styles.rootScreen}
-      colors={[Colors.primary700, Colors.accent500]}
-    >
-      <ImageBackground
-        source={require("../assets/images/riho.jpg")}
-        resizeMode="cover"
+    <>
+      <StatusBar style="light" />
+      <LinearGradient
         style={styles.rootScreen}
-        imageStyle={{ opacity: 0.15 }}
+        colors={[Colors.primary700, Colors.accent500]}
       >
-        <SafeAreaProvider>
-          <SafeAreaView style={styles.rootScreen} onLayout={onLayoutRootView}>
-            {screen}
-          </SafeAreaView>
-        </SafeAreaProvider>
-      </ImageBackground>
-    </LinearGradient>
+        <ImageBackground
+          source={require("../assets/images/riho.jpg")}
+          resizeMode="cover"
+          style={styles.rootScreen}
+          imageStyle={{ opacity: 0.15 }}
+        >
+          <SafeAreaProvider>
+            <SafeAreaView style={styles.rootScreen} onLayout={onLayoutRootView}>
+              {screen}
+            </SafeAreaView>
+          </SafeAreaProvider>
+        </ImageBackground>
+      </LinearGradient>
+    </>
   );
 }
 
