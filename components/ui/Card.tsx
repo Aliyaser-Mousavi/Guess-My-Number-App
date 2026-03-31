@@ -1,9 +1,18 @@
 import Colors from "@/constants/colors";
-import { Dimensions, StyleSheet, View } from "react-native";
+import React from "react";
+import { StyleSheet, View, useWindowDimensions } from "react-native";
+
 export default function Card({ children }: { children: React.ReactNode }) {
-  return <View style={styles.card}>{children}</View>;
+  const { width } = useWindowDimensions();
+
+  const marginTopDistance = width < 380 ? 18 : 36;
+
+  return (
+    <View style={[styles.card, { marginTop: marginTopDistance }]}>
+      {children}
+    </View>
+  );
 }
-const deviceWidth = Dimensions.get("window").width;
 
 const styles = StyleSheet.create({
   card: {
@@ -11,13 +20,12 @@ const styles = StyleSheet.create({
     marginHorizontal: 24,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: deviceWidth < 380 ? 18 : 36,
-    borderRadius: 8,
+    borderRadius: 16,
     backgroundColor: Colors.primary800,
-    elevation: 4,
+    elevation: 12,
     shadowColor: "black",
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 6,
-    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    shadowOpacity: 0.4,
   },
 });

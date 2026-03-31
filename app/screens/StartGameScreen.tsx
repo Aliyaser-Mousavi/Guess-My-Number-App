@@ -13,6 +13,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+
 export default function StartGameScreen({
   onPickNumber,
 }: {
@@ -20,12 +21,15 @@ export default function StartGameScreen({
 }) {
   const [enteredNumber, setEnteredNumber] = useState("");
   const { height } = useWindowDimensions();
+
   function numberInputHandler(enteredText: string) {
     setEnteredNumber(enteredText);
   }
+
   function resetInputHandler() {
     setEnteredNumber("");
   }
+
   function confirmInputHandler() {
     const chosenNumber = parseInt(enteredNumber);
     if (isNaN(chosenNumber) || chosenNumber <= 0 || chosenNumber > 99) {
@@ -36,7 +40,7 @@ export default function StartGameScreen({
           {
             text: "Okay",
             style: "destructive",
-            onPress: () => resetInputHandler(),
+            onPress: resetInputHandler,
           },
         ],
       );
@@ -44,7 +48,9 @@ export default function StartGameScreen({
     }
     onPickNumber(chosenNumber);
   }
-  const marginTopDistance = height < 400 ? 10 : 80;
+
+  const marginTopDistance = height < 400 ? 30 : 100;
+
   return (
     <ScrollView style={styles.screen}>
       <KeyboardAvoidingView style={styles.screen} behavior="position">
@@ -60,6 +66,7 @@ export default function StartGameScreen({
               autoCorrect={false}
               value={enteredNumber}
               onChangeText={numberInputHandler}
+              selectionColor={Colors.accent500}
             />
             <View style={styles.buttonsContainer}>
               <View style={styles.buttonContainer}>
@@ -78,31 +85,28 @@ export default function StartGameScreen({
   );
 }
 
-// const deviceHeight = Dimensions.get("window").height;
-
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
   rootContainer: {
     flex: 1,
-    // marginTop: deviceHeight < 400 ? 10 : 80,
     alignItems: "center",
   },
   numberInput: {
-    height: 40,
-    width: 50,
+    height: 50,
+    width: 60,
     fontSize: 32,
     borderBottomWidth: 2,
     borderBottomColor: Colors.accent500,
     color: Colors.accent500,
-    marginVertical: 8,
+    marginVertical: 16,
     fontWeight: "bold",
     textAlign: "center",
-    paddingVertical: 0,
   },
   buttonsContainer: {
     flexDirection: "row",
+    marginTop: 8,
   },
   buttonContainer: {
     flex: 1,

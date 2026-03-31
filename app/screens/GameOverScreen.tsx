@@ -21,66 +21,87 @@ export default function GameOverScreen({
   onStartGame: () => void;
 }) {
   const { width, height } = useWindowDimensions();
+
   let imageSize = 300;
+
   if (width < 380) {
     imageSize = 150;
   }
+
   if (height < 400) {
-    imageSize = 80;
+    imageSize = 100;
   }
+
   const imageStyle = {
     width: imageSize,
     height: imageSize,
     borderRadius: imageSize / 2,
+    marginVertical: height < 400 ? 10 : 36,
   };
+
   return (
-    <ScrollView style={styles.screen}>
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.scrollContent}
+    >
       <View style={styles.rootContainer}>
         <Title>GAME OVER!</Title>
         <View style={[styles.imageContainer, imageStyle]}>
-          <SuccessImage width={300} height={300} />
+          <SuccessImage width={imageSize} height={imageSize} />
         </View>
-        <View>
+        <View style={styles.resultContainer}>
           <Text style={styles.summaryText}>
             Your phone needed{" "}
-            <Text style={styles.Highlight}>{roundsNumber}</Text> rounds to guess
-            the number <Text style={styles.Highlight}>{userNumber}</Text>.
+            <Text style={styles.highlight}>{roundsNumber}</Text> rounds to guess
+            the number <Text style={styles.highlight}>{userNumber}</Text>.
           </Text>
-          <PrimaryButton onPress={onStartGame}>Start New Game</PrimaryButton>
+          <View style={styles.buttonWrapper}>
+            <PrimaryButton onPress={onStartGame}>Start New Game</PrimaryButton>
+          </View>
         </View>
       </View>
     </ScrollView>
   );
 }
-// const deviceWidth = Dimensions.get("window").width;
 
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+  },
   rootContainer: {
-    flex: 1,
     padding: 24,
     justifyContent: "center",
     alignItems: "center",
   },
   imageContainer: {
-    // width: deviceWidth < 380 ? 150 : 300,
-    // height: deviceWidth < 380 ? 150 : 300,
-    // borderRadius: deviceWidth < 380 ? 75 : 150,
     borderWidth: 3,
     borderColor: Colors.primary800,
+    backgroundColor: Colors.primary500,
     overflow: "hidden",
-    marginVertical: 36,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  resultContainer: {
+    alignItems: "center",
   },
   summaryText: {
     fontFamily: "play-fair",
-    fontSize: 24,
+    fontSize: 22,
     textAlign: "center",
     marginBottom: 24,
+    color: "white", // Better contrast against game background
   },
-  Highlight: {
+  highlight: {
     fontFamily: "play-fair-bold",
-    color: Colors.primary500,
+    color: Colors.accent500, // Using Accent color for highlight
+    fontSize: 26,
+  },
+  buttonWrapper: {
+    width: "100%",
+    minWidth: 200,
   },
 });

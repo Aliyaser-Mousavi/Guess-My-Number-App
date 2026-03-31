@@ -1,4 +1,3 @@
-import Colors from "@/constants/colors";
 import { useFonts } from "expo-font";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SplashScreen from "expo-splash-screen";
@@ -69,15 +68,12 @@ export default function Index() {
   return (
     <>
       <StatusBar style="light" />
-      <LinearGradient
-        style={styles.rootScreen}
-        colors={[Colors.primary700, Colors.accent500]}
-      >
+      <LinearGradient style={styles.rootScreen} colors={["#2c3e50", "#000000"]}>
         <ImageBackground
           source={require("../assets/images/riho.jpg")}
           resizeMode="cover"
           style={styles.rootScreen}
-          imageStyle={{ opacity: 0.15 }}
+          imageStyle={{ opacity: 0.2 }}
         >
           <SafeAreaProvider>
             <SafeAreaView style={styles.rootScreen} onLayout={onLayoutRootView}>
