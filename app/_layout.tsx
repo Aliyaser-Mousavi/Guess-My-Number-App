@@ -1,22 +1,39 @@
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { AlertProvider } from "@/context/AlertProvider";
+import { GameProvider } from "@/context/GameProvider";
+import Colors from "@/constants/colors";
 import {
   DarkTheme,
-  DefaultTheme,
   ThemeProvider,
-} from "@react-navigation/native";
+} from "expo-router/react-navigation";
 import { Stack } from "expo-router";
 import "react-native-reanimated";
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
+const AppTheme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    background: Colors.bg,
+    card: Colors.surface,
+    text: Colors.text,
+    border: Colors.border,
+    primary: Colors.primary,
+  },
+};
 
+export default function RootLayout() {
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-        }}
-      />
-    </ThemeProvider>
+    <GameProvider>
+      <AlertProvider>
+        <ThemeProvider value={AppTheme}>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: Colors.bg },
+              animation: "fade",
+            }}
+          />
+        </ThemeProvider>
+      </AlertProvider>
+    </GameProvider>
   );
 }

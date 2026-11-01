@@ -1,34 +1,40 @@
 import Colors from "@/constants/colors";
 import React from "react";
-import { StyleProp, StyleSheet, Text, TextStyle, View } from "react-native";
+import {
+  StyleSheet,
+  Text,
+  type StyleProp,
+  type TextStyle,
+} from "react-native";
 
 export default function SameText({
   children,
   style,
+  muted,
 }: {
   children: React.ReactNode;
   style?: StyleProp<TextStyle>;
+  muted?: boolean;
 }) {
   return (
-    <View style={styles.container}>
-      <Text style={[styles.instructionText, style]}>{children}</Text>
-    </View>
+    <Text
+      style={[
+        styles.text,
+        muted && { color: Colors.textMuted },
+        style,
+      ]}
+    >
+      {children}
+    </Text>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    marginVertical: 4,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  instructionText: {
+  text: {
     fontFamily: "play-fair",
-    color: Colors.accent500,
-    fontSize: 22,
+    color: Colors.accentSoft,
+    fontSize: 17,
     textAlign: "center",
-    textShadowColor: "rgba(0, 0, 0, 0.4)",
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+    lineHeight: 24,
   },
 });

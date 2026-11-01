@@ -1,33 +1,27 @@
 import Colors from "@/constants/colors";
 import React from "react";
-import { Platform, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, type StyleProp, type TextStyle } from "react-native";
 
-export default function Title({ children }: { children: string }) {
+export default function Title({
+  children,
+  style,
+  size = "lg",
+}: {
+  children: string;
+  style?: StyleProp<TextStyle>;
+  size?: "sm" | "md" | "lg" | "xl";
+}) {
+  const fontSize = { sm: 18, md: 22, lg: 28, xl: 36 }[size];
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>{children}</Text>
-    </View>
+    <Text style={[styles.title, { fontSize }, style]}>{children}</Text>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    alignItems: "center",
-    justifyContent: "center",
-    marginVertical: 24,
-  },
   title: {
     fontFamily: "play-fair-bold",
-    color: "white",
-    fontSize: 26,
+    color: Colors.text,
     textAlign: "center",
-    borderWidth: Platform.select({ ios: 0, android: 2 }),
-    borderColor: Colors.accent500,
-    padding: 12,
-    borderRadius: 8,
-    maxWidth: "90%",
-    textShadowColor: "rgba(0, 0, 0, 0.75)",
-    textShadowOffset: { width: -1, height: 1 },
-    textShadowRadius: 10,
+    letterSpacing: 0.4,
   },
 });

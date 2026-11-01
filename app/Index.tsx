@@ -1,20 +1,31 @@
+import AchievementsScreen from "@/screens/AchievementsScreen";
+import GameOverScreen from "@/screens/GameOverScreen";
+import GameScreen from "@/screens/GameScreen";
+import HomeScreen from "@/screens/HomeScreen";
+import HowToPlayScreen from "@/screens/HowToPlayScreen";
+import PlayerGuessScreen from "@/screens/PlayerGuessScreen";
+import SettingsScreen from "@/screens/SettingsScreen";
+import StartGameScreen, {
+  type SetupConfig,
+} from "@/screens/StartGameScreen";
+import StatsScreen from "@/screens/StatsScreen";
+import Colors from "@/constants/colors";
+import { useGame } from "@/context/GameProvider";
+import type { AppScreen, GameResult } from "@/types/game";
 import { useFonts } from "expo-font";
-import { LinearGradient } from "expo-linear-gradient";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useState } from "react";
-import { ImageBackground, StyleSheet } from "react-native";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import GameOverScreen from "./screens/GameOverScreen";
-import GameScreen from "./screens/GameScreen";
-import StartGameScreen from "./screens/StartGameScreen";
+import React, { useCallback, useState } from "react";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 SplashScreen.preventAutoHideAsync();
 
 export default function Index() {
-  const [userNumber, setUserNumber] = useState<number | null>(null);
-  const [gameIsOver, setGameIsOver] = useState(true);
-  const [guessRounds, setGuessRounds] = useState(0);
+  const { ready, recordGame, isDailyDoneToday } = useGame();
+  const [screen, setScreen] = useState<AppScreen>("home");
+  const [setup, setSetup] = useState<SetupConfig | null>(null);
+  const [result, setResult] = useState<GameResult | null>(null);
+  const [dailyForced, setDailyForced] = useState(false);
 
   const [fontsLoaded] = useFonts({
     "play-fair": require("@/assets/fonts/PlayfairDisplay-Regular.ttf"),
@@ -22,73 +33,138 @@ export default function Index() {
   });
 
   const onLayoutRootView = useCallback(async () => {
-    if (fontsLoaded) {
+    if (fontsLoaded && ready) {
       await SplashScreen.hideAsync();
     }
-  }, [fontsLoaded]);
+  }, [fontsLoaded, ready]);
 
-  if (!fontsLoaded) {
-    return null;
-  }
-
-  function pickedNumberHandler(pickedNumber: number) {
-    setUserNumber(pickedNumber);
-    setGameIsOver(false);
-  }
-
-  function gameOverHandler(numberOfRounds: number) {
-    setGameIsOver(true);
-    setGuessRounds(numberOfRounds);
-  }
-
-  function startNewGameHandler() {
-    setUserNumber(null);
-    setGameIsOver(true);
-    setGuessRounds(0);
-  }
-
-  let screen = <StartGameScreen onPickNumber={pickedNumberHandler} />;
-
-  if (userNumber !== null && !gameIsOver) {
-    screen = (
-      <GameScreen userNumber={userNumber} onGameOver={gameOverHandler} />
+  if (!fontsLoaded || !ready) {
+    return (
+      <View style={styles.boot}>
+        <ActivityIndicator size="large" color={Colors.accent} />
+      </View>
     );
   }
 
-  if (gameIsOver && userNumber !== null) {
-    screen = (
-      <GameOverScreen
-        roundsNumber={guessRounds}
-        userNumber={userNumber}
-        onStartGame={startNewGameHandler}
+  function goHome() {
+    setScreen("home");
+    setSetup(null);
+    setResult(null);
+    setDailyForced(false);
+  }
+
+  function handleStart(config: SetupConfig) {
+    setSetup(config);
+    setScreen("playing");
+  }
+
+  function handleGameOver(payload: {
+    won: boolean;
+    rounds: number;
+    elapsedMs: number;
+    hintsUsed: number;
+    guesses: number[];
+    secretNumber?: number;
+  }) {
+    if (!setup) return;
+    const recorded = recordGame({
+      won: payload.won,
+      rounds: payload.rounds,
+      userNumber: setup.userNumber ?? payload.secretNumber ?? 0,
+      secretNumber: payload.secretNumber,
+      elapsedMs: payload.elapsedMs,
+      mode: setup.mode,
+      difficulty: setup.difficultyId,
+      hintsUsed: payload.hintsUsed,
+      isDaily: setup.isDaily,
+      guesses: payload.guesses,
+    });
+    setResult(recorded);
+    setScreen("gameOver");
+  }
+
+  let content: React.ReactNode = null;
+
+  if (screen === "home") {
+    content = (
+      <HomeScreen
+        dailyDone={isDailyDoneToday}
+        onPlay={() => {
+          setDailyForced(false);
+          setScreen("setup");
+        }}
+        onDaily={() => {
+          setDailyForced(true);
+          setScreen("setup");
+        }}
+        onStats={() => setScreen("stats")}
+        onAchievements={() => setScreen("achievements")}
+        onSettings={() => setScreen("settings")}
+        onHowTo={() => setScreen("howToPlay")}
       />
     );
+  } else if (screen === "setup") {
+    content = (
+      <StartGameScreen
+        forcedDaily={dailyForced}
+        onBack={goHome}
+        onStart={handleStart}
+      />
+    );
+  } else if (screen === "playing" && setup) {
+    if (setup.mode === "player") {
+      content = (
+        <PlayerGuessScreen
+          difficultyId={setup.difficultyId}
+          isDaily={setup.isDaily}
+          onGameOver={handleGameOver}
+        />
+      );
+    } else if (setup.userNumber != null) {
+      content = (
+        <GameScreen
+          userNumber={setup.userNumber}
+          difficultyId={setup.difficultyId}
+          isDaily={setup.isDaily}
+          onGameOver={handleGameOver}
+        />
+      );
+    }
+  } else if (screen === "gameOver" && result) {
+    content = (
+      <GameOverScreen
+        result={result}
+        onHome={goHome}
+        onReplay={() => {
+          setResult(null);
+          setScreen("setup");
+        }}
+      />
+    );
+  } else if (screen === "stats") {
+    content = <StatsScreen onBack={() => setScreen("home")} />;
+  } else if (screen === "achievements") {
+    content = <AchievementsScreen onBack={() => setScreen("home")} />;
+  } else if (screen === "settings") {
+    content = <SettingsScreen onBack={() => setScreen("home")} />;
+  } else if (screen === "howToPlay") {
+    content = <HowToPlayScreen onBack={() => setScreen("home")} />;
   }
 
   return (
-    <>
+    <View style={styles.root} onLayout={onLayoutRootView}>
       <StatusBar style="light" />
-      <LinearGradient style={styles.rootScreen} colors={["#2c3e50", "#000000"]}>
-        <ImageBackground
-          source={require("../assets/images/riho.jpg")}
-          resizeMode="cover"
-          style={styles.rootScreen}
-          imageStyle={{ opacity: 0.2 }}
-        >
-          <SafeAreaProvider>
-            <SafeAreaView style={styles.rootScreen} onLayout={onLayoutRootView}>
-              {screen}
-            </SafeAreaView>
-          </SafeAreaProvider>
-        </ImageBackground>
-      </LinearGradient>
-    </>
+      {content}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  rootScreen: {
+  root: { flex: 1, backgroundColor: Colors.bg },
+  boot: {
     flex: 1,
+    backgroundColor: Colors.bg,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
-// npx expo start --localhost

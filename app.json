@@ -31,16 +31,16 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#06141B",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#06141B"
           }
         }
-      ]
-    ],
-    "web": {
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
-    }
+      ],
+      "expo-font",
+      "expo-image",
+      "expo-status-bar",
+      "expo-web-browser"
+    ]
   }
 }

@@ -1,51 +1,89 @@
 import Colors from "@/constants/colors";
-import React from "react";
+import React, { useEffect } from "react";
 import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+} from "react-native-reanimated";
 
-export default function NumberContainer({ children }: { children: number }) {
+export default function NumberContainer({
+  children,
+  label,
+}: {
+  children: number | string;
+  label?: string;
+}) {
   const { width } = useWindowDimensions();
+  const isSmall = width < 380;
+  const scale = useSharedValue(1);
 
-  const isSmallDevice = width < 380;
+  useEffect(() => {
+    scale.value = withSequence(
+      withSpring(1.08, { damping: 8 }),
+      withSpring(1, { damping: 12 }),
+    );
+  }, [children, scale]);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
 
   return (
-    <View style={[styles.container, isSmallDevice && styles.smallContainer]}>
-      <Text
-        style={[styles.numberText, isSmallDevice && styles.smallNumberText]}
+    <View style={styles.wrap}>
+      {label ? <Text style={styles.label}>{label}</Text> : null}
+      <Animated.View
+        style={[
+          styles.container,
+          isSmall && styles.smallContainer,
+          animStyle,
+        ]}
       >
-        {children}
-      </Text>
+        <Text style={[styles.numberText, isSmall && styles.smallNumberText]}>
+          {children}
+        </Text>
+      </Animated.View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrap: {
+    alignItems: "center",
+    marginVertical: 12,
+  },
+  label: {
+    fontFamily: "play-fair",
+    color: Colors.textMuted,
+    fontSize: 13,
+    marginBottom: 8,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+  },
   container: {
-    borderWidth: 4,
-    borderColor: Colors.accent500,
-    padding: 24,
-    borderRadius: 12, // Slightly more rounded for a modern look
-    margin: 24,
+    minWidth: 140,
+    paddingVertical: 22,
+    paddingHorizontal: 28,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
-    // Adding a subtle glow effect for gaming feel
-    shadowColor: Colors.accent500,
-    shadowOffset: { width: 0, height: 0 },
-    shadowRadius: 8,
-    shadowOpacity: 0.5,
-    elevation: 8,
-    backgroundColor: "rgba(0,0,0,0.2)", // Slight dark background to pop the number
+    backgroundColor: Colors.bgElevated,
+    borderWidth: 2,
+    borderColor: Colors.accent,
   },
   smallContainer: {
-    padding: 12,
-    margin: 12,
+    minWidth: 110,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
   },
   numberText: {
-    color: Colors.accent500,
-    fontSize: 42, // Increased for better visibility
+    color: Colors.accent,
+    fontSize: 48,
     fontFamily: "play-fair-bold",
     textAlign: "center",
   },
   smallNumberText: {
-    fontSize: 28,
+    fontSize: 34,
   },
 });
