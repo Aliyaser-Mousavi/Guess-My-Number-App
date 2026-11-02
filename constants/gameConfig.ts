@@ -1,4 +1,15 @@
-export type GameMode = "opponent" | "player";
+import Colors from "./colors";
+
+export type GameMode =
+  | "opponent"
+  | "player"
+  | "timeAttack"
+  | "survival"
+  | "blitz"
+  | "custom"
+  | "passAndPlay"
+  | "logicPuzzle";
+
 export type DifficultyId = "easy" | "medium" | "hard" | "expert";
 
 export type Difficulty = {
@@ -34,7 +45,7 @@ export const DIFFICULTIES: Difficulty[] = [
     multiplier: 1.5,
     playerLives: 7,
     hints: 2,
-    color: "#1FA8A0",
+    color: "#00D2B4",
   },
   {
     id: "hard",
@@ -45,7 +56,7 @@ export const DIFFICULTIES: Difficulty[] = [
     multiplier: 2.25,
     playerLives: 8,
     hints: 1,
-    color: "#F0A500",
+    color: "#FFB800",
   },
   {
     id: "expert",
@@ -56,7 +67,124 @@ export const DIFFICULTIES: Difficulty[] = [
     multiplier: 3.5,
     playerLives: 9,
     hints: 0,
-    color: "#E85D4C",
+    color: "#FF5252",
+  },
+];
+
+export type ModeMetadata = {
+  id: GameMode;
+  title: string;
+  badge: string;
+  shortDesc: string;
+  rules: string[];
+  icon: string;
+  color: string;
+};
+
+export const MODE_METADATA: ModeMetadata[] = [
+  {
+    id: "opponent",
+    title: "Oracle Guesses",
+    badge: "CLASSIC",
+    shortDesc: "You pick a secret number. The Oracle tracks it down.",
+    rules: [
+      "Think of a secret number within the chosen range.",
+      "Tell the Oracle if its guess is Higher or Lower.",
+      "Play honestly — the algorithm relies on your guidance!",
+    ],
+    icon: "sparkles",
+    color: Colors.accent,
+  },
+  {
+    id: "player",
+    title: "You Guess",
+    badge: "CLASSIC",
+    shortDesc: "The Oracle hides a number. You hunt it before lives run out.",
+    rules: [
+      "The Oracle secretly picks a number.",
+      "Each wrong guess consumes 1 life.",
+      "Use clues and search range to zero in on the target.",
+    ],
+    icon: "person",
+    color: Colors.primary,
+  },
+  {
+    id: "timeAttack",
+    title: "Time Attack",
+    badge: "SPEED",
+    shortDesc: "Beat the clock! Find the secret number before time runs out.",
+    rules: [
+      "Choose a countdown: 30s, 60s, or 90s.",
+      "Every guess instantly narrows the search range.",
+      "Faster solves earn huge speed multipliers!",
+    ],
+    icon: "timer",
+    color: "#00E5FF",
+  },
+  {
+    id: "survival",
+    title: "Survival Mode",
+    badge: "ENDLESS",
+    shortDesc: "Scale an endless gauntlet of increasingly larger numbers.",
+    rules: [
+      "Start at Level 1 with 5 shared lives.",
+      "Each solved number advances you to a wider range.",
+      "Solving restores +1 life. Run ends when lives reach 0.",
+    ],
+    icon: "shield-checkmark",
+    color: Colors.mint,
+  },
+  {
+    id: "blitz",
+    title: "Blitz Mode",
+    badge: "ARCADE",
+    shortDesc: "Solve as many numbers as possible in 60 frantic seconds.",
+    rules: [
+      "Fixed 60-second round.",
+      "Numbers spawn immediately after each solve.",
+      "Target is 10 numbers solved for Master rank!",
+    ],
+    icon: "flash",
+    color: "#FFA502",
+  },
+  {
+    id: "logicPuzzle",
+    title: "Logic Puzzle",
+    badge: "BRAIN",
+    shortDesc: "Deduce the secret number using mathematical clues.",
+    rules: [
+      "Read mathematical properties: parity, divisibility, digit sum.",
+      "Cross-examine clues to deduce the single unique number.",
+      "Request hints if needed at a small point cost.",
+    ],
+    icon: "bulb",
+    color: "#9C88FF",
+  },
+  {
+    id: "passAndPlay",
+    title: "Pass & Play",
+    badge: "2 PLAYERS",
+    shortDesc: "Challenge a friend on the same device with privacy screens.",
+    rules: [
+      "Player 1 secretly enters a number while Player 2 looks away.",
+      "Player 2 hunts the number with Higher/Lower feedback.",
+      "Roles swap, and the player with the best score wins!",
+    ],
+    icon: "people",
+    color: Colors.coral,
+  },
+  {
+    id: "custom",
+    title: "Custom Match",
+    badge: "SANDBOX",
+    shortDesc: "Customize your own ranges, lives, timer, and hints.",
+    rules: [
+      "Define custom minimum and maximum number bounds.",
+      "Set custom lives, timer limits, and hint counts.",
+      "Play with your exact custom rules.",
+    ],
+    icon: "options",
+    color: "#74B9FF",
   },
 ];
 
@@ -140,6 +268,30 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: "Win without using any hints",
     icon: "eye-off",
   },
+  {
+    id: "time_attack_master",
+    title: "Clock Stopper",
+    description: "Win a Time Attack game with >10s to spare",
+    icon: "timer",
+  },
+  {
+    id: "survival_veteran",
+    title: "Survivalist",
+    description: "Reach Level 5 in Survival Mode",
+    icon: "shield-checkmark",
+  },
+  {
+    id: "blitz_striker",
+    title: "Blitz Champion",
+    description: "Solve 5 or more numbers in Blitz Mode",
+    icon: "flash",
+  },
+  {
+    id: "puzzle_deducer",
+    title: "Master Sleuth",
+    description: "Solve a Logic Puzzle on first attempt",
+    icon: "bulb",
+  },
 ];
 
 export function getDifficulty(id: DifficultyId): Difficulty {
@@ -147,7 +299,7 @@ export function getDifficulty(id: DifficultyId): Difficulty {
 }
 
 export function idealRounds(min: number, max: number): number {
-  return Math.ceil(Math.log2(max - min + 1));
+  return Math.ceil(Math.log2(Math.max(1, max - min + 1)));
 }
 
 export function calculateScore({
@@ -173,7 +325,15 @@ export function calculateScore({
   const timeSeconds = elapsedMs / 1000;
   const timeBonus = Math.max(0, 120 - timeSeconds) * 2;
   const hintPenalty = hintsUsed * 40;
-  const modeBonus = mode === "player" ? 80 : 0;
+
+  let modeBonus = 0;
+  if (mode === "player") modeBonus = 80;
+  else if (mode === "timeAttack") modeBonus = 120;
+  else if (mode === "survival") modeBonus = 150;
+  else if (mode === "blitz") modeBonus = 140;
+  else if (mode === "logicPuzzle") modeBonus = 160;
+  else if (mode === "passAndPlay") modeBonus = 100;
+  else if (mode === "custom") modeBonus = 50;
 
   const raw =
     (220 + rangeSize * 0.8) * difficulty.multiplier * roundFactor +
@@ -199,8 +359,12 @@ export function seededRandom(seed: string): number {
   return x - Math.floor(x);
 }
 
-export function getDailyNumber(min: number, max: number): number {
-  const seed = getDailySeed();
+export function getDailyNumber(
+  min: number,
+  max: number,
+  customSeed?: string,
+): number {
+  const seed = customSeed ?? getDailySeed();
   const r = seededRandom(seed + "-guess");
   return Math.floor(r * (max - min + 1)) + min;
 }

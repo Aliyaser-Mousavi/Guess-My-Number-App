@@ -4,14 +4,35 @@ import GameScreen from "@/screens/GameScreen";
 import HomeScreen from "@/screens/HomeScreen";
 import HowToPlayScreen from "@/screens/HowToPlayScreen";
 import PlayerGuessScreen from "@/screens/PlayerGuessScreen";
+import ProfileScreen from "@/screens/ProfileScreen";
+import ProgressionScreen from "@/screens/ProgressionScreen";
 import SettingsScreen from "@/screens/SettingsScreen";
 import StartGameScreen, {
   type SetupConfig,
 } from "@/screens/StartGameScreen";
 import StatsScreen from "@/screens/StatsScreen";
+import BlitzGameScreen from "@/screens/gameModes/BlitzGameScreen";
+import CustomGameScreen from "@/screens/gameModes/CustomGameScreen";
+import LogicPuzzleGameScreen from "@/screens/gameModes/LogicPuzzleGameScreen";
+import PassAndPlayGameScreen from "@/screens/gameModes/PassAndPlayGameScreen";
+import SurvivalGameScreen from "@/screens/gameModes/SurvivalGameScreen";
+import TimeAttackGameScreen from "@/screens/gameModes/TimeAttackGameScreen";
+import LevelUpModal from "@/components/progression/LevelUpModal";
 import Colors from "@/constants/colors";
 import { useGame } from "@/context/GameProvider";
 import type { AppScreen, GameResult } from "@/types/game";
+import {
+  SpaceGrotesk_400Regular,
+  SpaceGrotesk_500Medium,
+  SpaceGrotesk_600SemiBold,
+  SpaceGrotesk_700Bold,
+} from "@expo-google-fonts/space-grotesk";
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from "@expo-google-fonts/inter";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
@@ -21,15 +42,33 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 SplashScreen.preventAutoHideAsync();
 
 export default function Index() {
-  const { ready, recordGame, isDailyDoneToday } = useGame();
+  const {
+    ready,
+    recordGame,
+    isDailyDoneToday,
+    startSession,
+    abandonSession,
+    levelUpEvent,
+    clearLevelUpEvent,
+    progression,
+  } = useGame();
   const [screen, setScreen] = useState<AppScreen>("home");
   const [setup, setSetup] = useState<SetupConfig | null>(null);
   const [result, setResult] = useState<GameResult | null>(null);
   const [dailyForced, setDailyForced] = useState(false);
 
   const [fontsLoaded] = useFonts({
-    "play-fair": require("@/assets/fonts/PlayfairDisplay-Regular.ttf"),
-    "play-fair-bold": require("@/assets/fonts/PlayfairDisplay-Bold.ttf"),
+    "SpaceGrotesk-Regular": SpaceGrotesk_400Regular,
+    "SpaceGrotesk-Medium": SpaceGrotesk_500Medium,
+    "SpaceGrotesk-SemiBold": SpaceGrotesk_600SemiBold,
+    "SpaceGrotesk-Bold": SpaceGrotesk_700Bold,
+    "Inter-Regular": Inter_400Regular,
+    "Inter-Medium": Inter_500Medium,
+    "Inter-SemiBold": Inter_600SemiBold,
+    "Inter-Bold": Inter_700Bold,
+    // Backward-compatibility aliases
+    "play-fair": Inter_400Regular,
+    "play-fair-bold": SpaceGrotesk_700Bold,
   });
 
   const onLayoutRootView = useCallback(async () => {
@@ -47,6 +86,7 @@ export default function Index() {
   }
 
   function goHome() {
+    abandonSession();
     setScreen("home");
     setSetup(null);
     setResult(null);
@@ -54,6 +94,12 @@ export default function Index() {
   }
 
   function handleStart(config: SetupConfig) {
+    startSession({
+      mode: config.mode,
+      difficultyId: config.difficultyId,
+      isDaily: config.isDaily,
+      targetNumber: config.userNumber,
+    });
     setSetup(config);
     setScreen("playing");
   }
@@ -65,6 +111,7 @@ export default function Index() {
     hintsUsed: number;
     guesses: number[];
     secretNumber?: number;
+    score?: number;
   }) {
     if (!setup) return;
     const recorded = recordGame({
@@ -78,6 +125,10 @@ export default function Index() {
       hintsUsed: payload.hintsUsed,
       isDaily: setup.isDaily,
       guesses: payload.guesses,
+      score: payload.score,
+      customConfig: setup.customConfig,
+      player1Name: setup.player1Name,
+      player2Name: setup.player2Name,
     });
     setResult(recorded);
     setScreen("gameOver");
@@ -101,6 +152,8 @@ export default function Index() {
         onAchievements={() => setScreen("achievements")}
         onSettings={() => setScreen("settings")}
         onHowTo={() => setScreen("howToPlay")}
+        onProgression={() => setScreen("progression")}
+        onProfile={() => setScreen("profile")}
       />
     );
   } else if (screen === "setup") {
@@ -112,12 +165,63 @@ export default function Index() {
       />
     );
   } else if (screen === "playing" && setup) {
-    if (setup.mode === "player") {
+    if (setup.mode === "timeAttack") {
+      content = (
+        <TimeAttackGameScreen
+          difficultyId={setup.difficultyId}
+          durationSeconds={setup.timeLimitSeconds}
+          onGameOver={handleGameOver}
+          onAbandon={goHome}
+        />
+      );
+    } else if (setup.mode === "survival") {
+      content = (
+        <SurvivalGameScreen
+          onGameOver={handleGameOver}
+          onAbandon={goHome}
+        />
+      );
+    } else if (setup.mode === "blitz") {
+      content = (
+        <BlitzGameScreen
+          onGameOver={handleGameOver}
+          onAbandon={goHome}
+        />
+      );
+    } else if (setup.mode === "custom" && setup.customConfig) {
+      content = (
+        <CustomGameScreen
+          config={setup.customConfig}
+          userNumber={setup.userNumber}
+          onGameOver={handleGameOver}
+          onAbandon={goHome}
+        />
+      );
+    } else if (setup.mode === "passAndPlay") {
+      content = (
+        <PassAndPlayGameScreen
+          player1Name={setup.player1Name}
+          player2Name={setup.player2Name}
+          onGameOver={handleGameOver}
+          onBack={goHome}
+        />
+      );
+    } else if (setup.mode === "logicPuzzle") {
+      content = (
+        <LogicPuzzleGameScreen
+          difficultyId={setup.difficultyId}
+          onGameOver={handleGameOver}
+          onAbandon={goHome}
+        />
+      );
+    } else if (setup.mode === "player") {
       content = (
         <PlayerGuessScreen
           difficultyId={setup.difficultyId}
           isDaily={setup.isDaily}
+          dailyDateStr={setup.dailyDateStr}
           onGameOver={handleGameOver}
+          onAbandon={goHome}
         />
       );
     } else if (setup.userNumber != null) {
@@ -142,7 +246,34 @@ export default function Index() {
       />
     );
   } else if (screen === "stats") {
-    content = <StatsScreen onBack={() => setScreen("home")} />;
+    content = (
+      <StatsScreen
+        onBack={() => setScreen("home")}
+        onPlayArchivedDaily={(dateStr) => {
+          handleStart({
+            mode: "player",
+            difficultyId: "medium",
+            isDaily: true,
+            dailyDateStr: dateStr,
+          });
+        }}
+      />
+    );
+  } else if (screen === "progression") {
+    content = (
+      <ProgressionScreen
+        onBack={() => setScreen("home")}
+        onOpenAchievements={() => setScreen("achievements")}
+      />
+    );
+  } else if (screen === "profile") {
+    content = (
+      <ProfileScreen
+        onBack={() => setScreen("home")}
+        onOpenProgression={() => setScreen("progression")}
+        onOpenBadges={() => setScreen("achievements")}
+      />
+    );
   } else if (screen === "achievements") {
     content = <AchievementsScreen onBack={() => setScreen("home")} />;
   } else if (screen === "settings") {
@@ -155,6 +286,12 @@ export default function Index() {
     <View style={styles.root} onLayout={onLayoutRootView}>
       <StatusBar style="light" />
       {content}
+      <LevelUpModal
+        visible={levelUpEvent != null}
+        level={levelUpEvent?.newLevel ?? progression.level}
+        levelsGained={levelUpEvent?.levelsGained ?? 1}
+        onClose={clearLevelUpEvent}
+      />
     </View>
   );
 }

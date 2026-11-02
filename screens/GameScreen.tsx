@@ -9,6 +9,7 @@ import ScreenBackground from "@/components/ui/ScreenBackground";
 import Title from "@/components/ui/Title";
 import Colors from "@/constants/colors";
 import { getDifficulty, type DifficultyId } from "@/constants/gameConfig";
+import { FontFamily, Radius } from "@/constants/theme";
 import { useAppAlert } from "@/context/AlertProvider";
 import { useGame } from "@/context/GameProvider";
 import { Ionicons } from "@expo/vector-icons";
@@ -55,20 +56,22 @@ export default function GameScreen({
   onGameOver,
 }: Props) {
   const difficulty = getDifficulty(difficultyId);
-  const { buzz, settings } = useGame();
+  const { buzz, settings, recordSessionGuess, recordSessionHint } = useGame();
   const { showAlert } = useAppAlert();
   const { width } = useWindowDimensions();
 
-  const startAt = useRef(Date.now()).current;
+  const [startAt] = useState(() => Date.now());
   const ended = useRef(false);
 
-  const initialGuess = generateRandomBetween(
-    difficulty.min,
-    difficulty.max + 1,
-    userNumber,
+  const [initialGuess] = useState(() =>
+    generateRandomBetween(
+      difficulty.min,
+      difficulty.max + 1,
+      userNumber,
+    ),
   );
   const [currentGuess, setCurrentGuess] = useState(initialGuess);
-  const [guessRounds, setGuessRounds] = useState([initialGuess]);
+  const [guessRounds, setGuessRounds] = useState<number[]>([initialGuess]);
   const [hintsLeft, setHintsLeft] = useState(difficulty.hints);
   const [hintsUsed, setHintsUsed] = useState(0);
   const [boundMin, setBoundMin] = useState(difficulty.min);
@@ -103,8 +106,8 @@ export default function GameScreen({
       (direction === "greater" && currentGuess > userNumber)
     ) {
       buzz("error");
-      showAlert("Don't lie!", "You know that this is wrong...", [
-        { text: "Sorry!", style: "cancel" },
+      showAlert("Honesty Check", "You know that direction is incorrect! Keep it honest for the Oracle.", [
+        { text: "My Mistake", style: "cancel" },
       ]);
       return;
     }
@@ -132,32 +135,36 @@ export default function GameScreen({
       nextMax,
       currentGuess,
     );
+    recordSessionGuess(newRandomNumber, "oracle");
     setCurrentGuess(newRandomNumber);
     setGuessRounds((prev) => [newRandomNumber, ...prev]);
   }
 
   function useHint() {
     if (hintsLeft <= 0) return;
+    recordSessionHint();
     const midpoint = Math.floor((boundMin + boundMax) / 2);
     const tip =
       userNumber < midpoint
-        ? `The number is below ${midpoint}.`
-        : `The number is ${midpoint} or higher.`;
+        ? `The secret number is strictly below ${midpoint}.`
+        : `The secret number is ${midpoint} or higher.`;
     setHintsLeft((h) => h - 1);
     setHintsUsed((h) => h + 1);
     buzz("light");
-    showAlert("Hint", tip, [{ text: "Got it" }]);
+    showAlert("Oracle Insight", tip, [{ text: "Got it" }]);
   }
 
   const controls = (
-    <Card>
-      <SameText style={{ marginBottom: 12 }}>Higher or Lower?</SameText>
+    <Card variant="elevated" style={styles.controlsCard}>
+      <SameText muted style={styles.questionText}>
+        Is your number higher or lower than {currentGuess}?
+      </SameText>
       <View style={styles.buttonsContainer}>
         <View style={styles.buttonContainer}>
           <PrimaryButton
             variant="secondary"
             onPress={() => nextGuessHandler("lower")}
-            icon={<Ionicons name="remove" size={22} color={Colors.text} />}
+            icon={<Ionicons name="arrow-down" size={20} color={Colors.coral} />}
           >
             Lower
           </PrimaryButton>
@@ -166,15 +173,21 @@ export default function GameScreen({
           <PrimaryButton
             variant="primary"
             onPress={() => nextGuessHandler("greater")}
-            icon={<Ionicons name="add" size={22} color={Colors.white} />}
+            icon={<Ionicons name="arrow-up" size={20} color={Colors.bg} />}
           >
             Higher
           </PrimaryButton>
         </View>
       </View>
       {hintsLeft > 0 && (
-        <PrimaryButton variant="ghost" onPress={useHint}>
-          Use Hint ({hintsLeft} left)
+        <PrimaryButton
+          variant="ghost"
+          size="sm"
+          onPress={useHint}
+          icon={<Ionicons name="bulb-outline" size={16} color={Colors.accent} />}
+          style={{ marginTop: 8 }}
+        >
+          Use Oracle Hint ({hintsLeft} left)
         </PrimaryButton>
       )}
     </Card>
@@ -184,26 +197,34 @@ export default function GameScreen({
     <ScreenBackground>
       <SafeAreaView style={styles.safe}>
         <View style={styles.screen}>
+          {/* Top HUD Display */}
           <View style={styles.hud}>
             <View style={styles.hudChip}>
               <Text style={styles.hudLabel}>ROUND</Text>
               <Text style={styles.hudValue}>{guessRounds.length}</Text>
             </View>
             {settings.showTimer && (
-              <GameTimer running={!ended.current} startAt={startAt} />
+              <GameTimer running={true} startAt={startAt} />
             )}
             <View style={styles.hudChip}>
               <Text style={styles.hudLabel}>
                 {isDaily ? "DAILY" : difficulty.label.toUpperCase()}
               </Text>
               <Text style={styles.hudValue}>
-                {difficulty.min}-{difficulty.max}
+                {difficulty.min}–{difficulty.max}
               </Text>
             </View>
           </View>
 
-          <Title size="md">{"Oracle's Guess"}</Title>
+          {/* Heading */}
+          <View style={styles.headerArea}>
+            <Title size="md">Oracle&apos;s Guess</Title>
+            <Text style={styles.headerSub}>
+              Round {guessRounds.length} • Narrowing the bounds
+            </Text>
+          </View>
 
+          {/* Centerpiece Number Display */}
           {width > 500 ? (
             <View style={{ width: "100%" }}>
               <View style={styles.wideRow}>
@@ -211,30 +232,45 @@ export default function GameScreen({
                   <PrimaryButton
                     variant="secondary"
                     onPress={() => nextGuessHandler("lower")}
+                    icon={<Ionicons name="arrow-down" size={20} color={Colors.coral} />}
                   >
                     Lower
                   </PrimaryButton>
                 </View>
-                <NumberContainer>{currentGuess}</NumberContainer>
+                <NumberContainer label="CURRENT ESTIMATE">
+                  {currentGuess}
+                </NumberContainer>
                 <View style={styles.buttonContainer}>
-                  <PrimaryButton onPress={() => nextGuessHandler("greater")}>
+                  <PrimaryButton
+                    variant="primary"
+                    onPress={() => nextGuessHandler("greater")}
+                    icon={<Ionicons name="arrow-up" size={20} color={Colors.bg} />}
+                  >
                     Higher
                   </PrimaryButton>
                 </View>
               </View>
               {hintsLeft > 0 && (
-                <PrimaryButton variant="ghost" onPress={useHint}>
-                  Use Hint ({hintsLeft} left)
+                <PrimaryButton
+                  variant="ghost"
+                  size="sm"
+                  onPress={useHint}
+                  icon={<Ionicons name="bulb-outline" size={16} color={Colors.accent} />}
+                >
+                  Use Oracle Hint ({hintsLeft} left)
                 </PrimaryButton>
               )}
             </View>
           ) : (
             <>
-              <NumberContainer>{currentGuess}</NumberContainer>
+              <NumberContainer label="CURRENT ESTIMATE">
+                {currentGuess}
+              </NumberContainer>
               {controls}
             </>
           )}
 
+          {/* Search Range Bar */}
           {settings.showRangeBar && (
             <RangeBar
               min={difficulty.min}
@@ -244,7 +280,9 @@ export default function GameScreen({
             />
           )}
 
+          {/* Guess Log History */}
           <View style={styles.listContainer}>
+            <Text style={styles.historyHeader}>GUESS HISTORY</Text>
             <FlatList
               data={guessRounds}
               renderItem={(itemData) => (
@@ -256,6 +294,7 @@ export default function GameScreen({
               )}
               keyExtractor={(item, index) => `${item}-${index}`}
               showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 16 }}
             />
           </View>
         </View>
@@ -268,53 +307,85 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   screen: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 8,
     alignItems: "center",
   },
   hud: {
     flexDirection: "row",
     width: "100%",
     justifyContent: "space-between",
-    marginBottom: 12,
+    alignItems: "center",
+    marginBottom: 8,
     gap: 8,
   },
   hudChip: {
     flex: 1,
     paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 12,
+    paddingVertical: 7,
+    borderRadius: Radius.sm,
     backgroundColor: Colors.bgElevated,
     borderWidth: 1,
     borderColor: Colors.border,
     alignItems: "center",
   },
   hudLabel: {
-    fontFamily: "play-fair",
+    fontFamily: FontFamily.bodyBold,
     color: Colors.textDim,
-    fontSize: 10,
-    letterSpacing: 1,
+    fontSize: 9,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
   },
   hudValue: {
-    fontFamily: "play-fair-bold",
+    fontFamily: FontFamily.display,
     color: Colors.text,
     fontSize: 14,
+    fontVariant: ["tabular-nums"],
+    marginTop: 1,
+  },
+  headerArea: {
+    alignItems: "center",
+    marginVertical: 4,
+  },
+  headerSub: {
+    fontFamily: FontFamily.body,
+    color: Colors.textMuted,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  controlsCard: {
+    padding: 16,
+    marginVertical: 6,
+  },
+  questionText: {
+    fontSize: 13,
+    marginBottom: 10,
   },
   buttonsContainer: {
     flexDirection: "row",
-    gap: 8,
+    gap: 10,
   },
   buttonContainer: {
     flex: 1,
   },
   listContainer: {
     flex: 1,
-    paddingTop: 12,
+    paddingTop: 8,
     width: "100%",
+  },
+  historyHeader: {
+    fontFamily: FontFamily.bodyBold,
+    color: Colors.textDim,
+    fontSize: 10,
+    letterSpacing: 1.5,
+    marginBottom: 6,
+    paddingLeft: 2,
   },
   wideRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     width: "100%",
-    gap: 8,
+    gap: 12,
   },
 });

@@ -1,4 +1,5 @@
 import Colors from "@/constants/colors";
+import { FontFamily, Radius } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
@@ -16,12 +17,16 @@ export default function StatChip({
 }) {
   return (
     <View style={styles.chip}>
-      <View style={[styles.iconWrap, { backgroundColor: color + "33" }]}>
-        <Ionicons name={icon} size={16} color={color} />
+      <View style={[styles.iconWrap, { backgroundColor: color + "1F" }]}>
+        <Ionicons name={icon} size={17} color={color} />
       </View>
-      <View>
-        <Text style={styles.label}>{label}</Text>
-        <Text style={styles.value}>{value}</Text>
+      <View style={styles.textContainer}>
+        <Text numberOfLines={1} style={styles.label}>
+          {label}
+        </Text>
+        <Text numberOfLines={1} style={styles.value}>
+          {value}
+        </Text>
       </View>
     </View>
   );
@@ -31,30 +36,39 @@ const styles = StyleSheet.create({
   chip: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
     backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 12,
+    borderRadius: Radius.md,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: Colors.border,
     flex: 1,
     minWidth: "45%",
   },
   iconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+    width: 36,
+    height: 36,
+    borderRadius: Radius.sm,
     alignItems: "center",
     justifyContent: "center",
   },
+  textContainer: {
+    flex: 1,
+    justifyContent: "center",
+  },
   label: {
-    fontFamily: "play-fair",
-    color: Colors.textMuted,
+    fontFamily: FontFamily.bodyMedium,
+    color: Colors.textDim,
     fontSize: 11,
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+    marginBottom: 2,
   },
   value: {
-    fontFamily: "play-fair-bold",
+    fontFamily: FontFamily.display,
     color: Colors.text,
-    fontSize: 16,
+    fontSize: 17,
+    fontVariant: ["tabular-nums"],
   },
 });

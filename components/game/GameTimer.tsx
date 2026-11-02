@@ -1,9 +1,10 @@
 import Colors from "@/constants/colors";
+import { FontFamily, Radius } from "@/constants/theme";
 import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-function formatMs(ms: number) {
-  const total = Math.floor(ms / 1000);
+export function formatElapsed(ms: number) {
+  const total = Math.floor(Math.max(0, ms) / 1000);
   const m = Math.floor(total / 60);
   const s = total % 60;
   return `${m}:${s.toString().padStart(2, "0")}`;
@@ -11,53 +12,65 @@ function formatMs(ms: number) {
 
 export default function GameTimer({
   running,
-  startAt,
+  startAt: _startAt,
+  paused = false,
 }: {
   running: boolean;
-  startAt: number;
+  startAt?: number;
+  paused?: boolean;
 }) {
-  const [now, setNow] = useState(Date.now());
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const lastTickRef = React.useRef(0);
 
   useEffect(() => {
-    if (!running) return;
-    const id = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(id);
-  }, [running]);
+    if (!running || paused) {
+      lastTickRef.current = Date.now();
+      return;
+    }
 
-  const elapsed = Math.max(0, now - startAt);
+    lastTickRef.current = Date.now();
+    const id = setInterval(() => {
+      const current = Date.now();
+      const delta = current - lastTickRef.current;
+      lastTickRef.current = current;
+      setElapsedMs((prev) => prev + delta);
+    }, 250);
+
+    return () => clearInterval(id);
+  }, [running, paused]);
 
   return (
     <View style={styles.chip}>
       <Text style={styles.label}>TIME</Text>
-      <Text style={styles.value}>{formatMs(elapsed)}</Text>
+      <Text style={styles.value}>{formatElapsed(elapsedMs)}</Text>
     </View>
   );
-}
-
-export function formatElapsed(ms: number) {
-  return formatMs(ms);
 }
 
 const styles = StyleSheet.create({
   chip: {
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
+    paddingVertical: 7,
+    borderRadius: Radius.sm,
     backgroundColor: Colors.bgElevated,
     borderWidth: 1,
     borderColor: Colors.border,
     alignItems: "center",
+    justifyContent: "center",
     minWidth: 72,
   },
   label: {
-    fontFamily: "play-fair",
+    fontFamily: FontFamily.bodyBold,
     color: Colors.textDim,
-    fontSize: 10,
-    letterSpacing: 1,
+    fontSize: 9,
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
   },
   value: {
-    fontFamily: "play-fair-bold",
+    fontFamily: FontFamily.display,
     color: Colors.mint,
-    fontSize: 16,
+    fontSize: 15,
+    fontVariant: ["tabular-nums"],
+    marginTop: 1,
   },
 });

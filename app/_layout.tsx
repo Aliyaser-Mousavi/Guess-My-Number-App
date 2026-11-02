@@ -4,7 +4,7 @@ import Colors from "@/constants/colors";
 import {
   DarkTheme,
   ThemeProvider,
-} from "expo-router/react-navigation";
+} from "@react-navigation/native";
 import { Stack } from "expo-router";
 import "react-native-reanimated";
 

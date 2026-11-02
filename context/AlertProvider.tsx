@@ -1,4 +1,5 @@
 import Colors from "@/constants/colors";
+import { FontFamily, Radius } from "@/constants/theme";
 import React, {
   createContext,
   useCallback,
@@ -15,12 +16,6 @@ export type AlertButton = {
   text: string;
   style?: AlertButtonStyle;
   onPress?: () => void;
-};
-
-type AlertOptions = {
-  title: string;
-  message?: string;
-  buttons?: AlertButton[];
 };
 
 type AlertContextValue = {
@@ -122,46 +117,47 @@ const styles = StyleSheet.create({
   },
   container: {
     backgroundColor: Colors.surface,
-    borderRadius: 22,
-    borderWidth: 1,
+    borderRadius: Radius.lg,
+    borderWidth: 1.5,
     borderColor: Colors.borderStrong,
     paddingTop: 22,
-    paddingBottom: 14,
-    paddingHorizontal: 18,
-    width: 300,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
+    width: 310,
   },
   title: {
-    fontFamily: "play-fair-bold",
+    fontFamily: FontFamily.display,
     color: Colors.text,
-    fontSize: 20,
+    fontSize: 19,
     textAlign: "center",
+    letterSpacing: -0.2,
   },
   message: {
-    fontFamily: "play-fair",
+    fontFamily: FontFamily.body,
     color: Colors.textMuted,
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 21,
     textAlign: "center",
-    marginTop: 6,
+    marginTop: 8,
   },
   actionBtn: {
-    borderRadius: 14,
+    borderRadius: Radius.sm,
     paddingHorizontal: 18,
-    paddingVertical: 10,
-    minWidth: 96,
+    paddingVertical: 11,
+    minWidth: 100,
     alignItems: "center",
     justifyContent: "center",
   },
   cancelText: {
-    fontFamily: "play-fair-bold",
-    color: Colors.text,
-    fontSize: 15,
+    fontFamily: FontFamily.bodyBold,
+    color: Colors.textMuted,
+    fontSize: 14,
     textAlign: "center",
   },
   confirmText: {
-    fontFamily: "play-fair-bold",
-    color: Colors.white,
-    fontSize: 15,
+    fontFamily: FontFamily.bodyBold,
+    color: Colors.bg,
+    fontSize: 14,
     textAlign: "center",
   },
 });

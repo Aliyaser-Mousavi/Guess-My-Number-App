@@ -1,4 +1,5 @@
 import Colors from "@/constants/colors";
+import { FontFamily } from "@/constants/theme";
 import React from "react";
 import {
   StyleSheet,
@@ -11,16 +12,22 @@ export default function SameText({
   children,
   style,
   muted,
+  accent,
+  dim,
 }: {
   children: React.ReactNode;
   style?: StyleProp<TextStyle>;
   muted?: boolean;
+  accent?: boolean;
+  dim?: boolean;
 }) {
   return (
     <Text
       style={[
         styles.text,
-        muted && { color: Colors.textMuted },
+        muted && styles.muted,
+        accent && styles.accent,
+        dim && styles.dim,
         style,
       ]}
     >
@@ -31,10 +38,20 @@ export default function SameText({
 
 const styles = StyleSheet.create({
   text: {
-    fontFamily: "play-fair",
-    color: Colors.accentSoft,
-    fontSize: 17,
+    fontFamily: FontFamily.body,
+    color: Colors.text,
+    fontSize: 15,
     textAlign: "center",
-    lineHeight: 24,
+    lineHeight: 22,
+  },
+  muted: {
+    color: Colors.textMuted,
+  },
+  accent: {
+    color: Colors.accent,
+    fontFamily: FontFamily.bodySemiBold,
+  },
+  dim: {
+    color: Colors.textDim,
   },
 });
