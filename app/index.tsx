@@ -18,7 +18,9 @@ import PassAndPlayGameScreen from "@/screens/gameModes/PassAndPlayGameScreen";
 import SurvivalGameScreen from "@/screens/gameModes/SurvivalGameScreen";
 import TimeAttackGameScreen from "@/screens/gameModes/TimeAttackGameScreen";
 import LevelUpModal from "@/components/progression/LevelUpModal";
+import AuthModal from "@/components/auth/AuthModal";
 import Colors from "@/constants/colors";
+import { useAuth } from "@/context/AuthProvider";
 import { useGame } from "@/context/GameProvider";
 import type { AppScreen, GameResult } from "@/types/game";
 import {
@@ -52,6 +54,7 @@ export default function Index() {
     clearLevelUpEvent,
     progression,
   } = useGame();
+  const { isRecoveryMode, clearRecoveryMode } = useAuth();
   const [screen, setScreen] = useState<AppScreen>("home");
   const [setup, setSetup] = useState<SetupConfig | null>(null);
   const [result, setResult] = useState<GameResult | null>(null);
@@ -291,6 +294,11 @@ export default function Index() {
         level={levelUpEvent?.newLevel ?? progression.level}
         levelsGained={levelUpEvent?.levelsGained ?? 1}
         onClose={clearLevelUpEvent}
+      />
+      <AuthModal
+        visible={isRecoveryMode}
+        initialMode="update_password"
+        onClose={clearRecoveryMode}
       />
     </View>
   );

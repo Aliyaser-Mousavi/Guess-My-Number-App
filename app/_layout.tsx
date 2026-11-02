@@ -1,4 +1,5 @@
 import { AlertProvider } from "@/context/AlertProvider";
+import { AuthProvider } from "@/context/AuthProvider";
 import { GameProvider } from "@/context/GameProvider";
 import Colors from "@/constants/colors";
 import {
@@ -22,18 +23,20 @@ const AppTheme = {
 
 export default function RootLayout() {
   return (
-    <GameProvider>
-      <AlertProvider>
-        <ThemeProvider value={AppTheme}>
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: Colors.bg },
-              animation: "fade",
-            }}
-          />
-        </ThemeProvider>
-      </AlertProvider>
-    </GameProvider>
+    <AuthProvider>
+      <GameProvider>
+        <AlertProvider>
+          <ThemeProvider value={AppTheme}>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: Colors.bg },
+                animation: "fade",
+              }}
+            />
+          </ThemeProvider>
+        </AlertProvider>
+      </GameProvider>
+    </AuthProvider>
   );
 }

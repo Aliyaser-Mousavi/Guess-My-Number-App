@@ -475,7 +475,7 @@ export const DEFAULT_PROFILE: PlayerProfile = {
   id: "player_default",
   displayName: "Number Hunter",
   avatarId: "oracle_orb",
-  titleId: "Apprentice Hunter",
+  titleId: "apprentice_hunter",
   showcaseAchievements: [],
   createdAt: 0,
   updatedAt: 0,

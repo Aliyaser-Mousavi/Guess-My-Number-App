@@ -16,3 +16,5 @@ export * from "./achievements/AchievementService";
 export * from "./theme/ThemeService";
 export * from "./localization/LocalizationService";
 export * from "./notifications/NotificationService";
+export * from "./auth/AuthService";
+export * from "@/lib/supabase";

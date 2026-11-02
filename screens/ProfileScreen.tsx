@@ -1,3 +1,4 @@
+import AuthModal from "@/components/auth/AuthModal";
 import EditProfileModal from "@/components/profile/EditProfileModal";
 import PlayerAvatar from "@/components/profile/PlayerAvatar";
 import Card from "@/components/ui/Card";
@@ -7,8 +8,10 @@ import StatChip from "@/components/ui/StatChip";
 import Title from "@/components/ui/Title";
 import Colors from "@/constants/colors";
 import { FontFamily, Radius } from "@/constants/theme";
+import { useAuth } from "@/context/AuthProvider";
 import { useGame } from "@/context/GameProvider";
 import { EXPANDED_ACHIEVEMENTS } from "@/services/achievements/AchievementService";
+import { CosmeticsService } from "@/services/cosmetics/CosmeticsService";
 import { LocalizationService } from "@/services/localization/LocalizationService";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
@@ -46,8 +49,10 @@ export default function ProfileScreen({
     formatNumber,
     isRTL,
   } = useGame();
+  const { user, isGuest, dbProfile, signOut } = useAuth();
 
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   const winRate =
     stats.gamesPlayed === 0
@@ -148,7 +153,7 @@ export default function ProfileScreen({
                 <View style={styles.titleBadge}>
                   <Ionicons name="sparkles" size={12} color={Colors.accent} />
                   <Text style={styles.titleBadgeText}>
-                    {profile.titleId ?? progression.rankTitle}
+                    {CosmeticsService.getTitleName(profile.titleId) ?? progression.rankTitle}
                   </Text>
                 </View>
 
@@ -205,6 +210,92 @@ export default function ProfileScreen({
                 />
               </View>
             </View>
+          </Card>
+
+          {/* Account & Online Identity Card */}
+          <Card variant="default" style={styles.accountCard}>
+            <View style={[styles.accountCardHeader, isRTL && styles.rowReverse]}>
+              <View
+                style={[
+                  styles.accountBadge,
+                  !isGuest && styles.accountBadgeVerified,
+                  isRTL && styles.rowReverse,
+                ]}
+              >
+                <Ionicons
+                  name={isGuest ? "cloud-offline" : "shield-checkmark"}
+                  size={14}
+                  color={isGuest ? Colors.textMuted : Colors.mint}
+                />
+                <Text
+                  style={[
+                    styles.accountBadgeText,
+                    !isGuest && { color: Colors.mint },
+                  ]}
+                >
+                  {isGuest ? "GUEST PLAYER (OFFLINE)" : "VERIFIED HUNTER"}
+                </Text>
+              </View>
+              <Text style={styles.accountCardSub} numberOfLines={1}>
+                {isGuest ? "Local progress" : (user?.email ?? "Cloud Synced")}
+              </Text>
+            </View>
+
+            {isGuest ? (
+              <>
+                <Text style={[styles.accountDesc, isRTL && { textAlign: "right" }]}>
+                  Link your local progress to a Hunter account. Claim your unique
+                  username and prepare for cloud backup across devices!
+                </Text>
+                <View style={[styles.accountActionRow, isRTL && styles.rowReverse]}>
+                  <PrimaryButton
+                    variant="accent"
+                    size="sm"
+                    onPress={() => {
+                      buzz("light");
+                      playSound("button_click");
+                      setShowAuthModal(true);
+                    }}
+                    icon={
+                      <Ionicons
+                        name="log-in-outline"
+                        size={16}
+                        color={Colors.bg}
+                      />
+                    }
+                  >
+                    Sign In / Register
+                  </PrimaryButton>
+                </View>
+              </>
+            ) : (
+              <View style={[styles.accountAuthBody, isRTL && styles.rowReverse]}>
+                <View style={[styles.accountInfoCol, isRTL && { alignItems: "flex-end" }]}>
+                  <Text style={styles.accountMetaKey}>ACCOUNT HANDLE</Text>
+                  <Text style={styles.accountMetaVal}>
+                    @{dbProfile?.username ?? "hunter"}
+                  </Text>
+                </View>
+                <PrimaryButton
+                  variant="secondary"
+                  size="sm"
+                  onPress={async () => {
+                    buzz("light");
+                    playSound("button_click");
+                    await signOut();
+                  }}
+                  icon={
+                    <Ionicons
+                      name="log-out-outline"
+                      size={16}
+                      color={Colors.text}
+                    />
+                  }
+                >
+                  Sign Out
+                </PrimaryButton>
+              </View>
+            )}
           </Card>
 
           {/* Quick Statistics Snapshot */}
@@ -408,6 +499,12 @@ export default function ProfileScreen({
         <EditProfileModal
           visible={showEditModal}
           onClose={() => setShowEditModal(false)}
+        />
+
+        {/* Auth Modal */}
+        <AuthModal
+          visible={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
         />
       </SafeAreaView>
     </ScreenBackground>
@@ -728,6 +825,78 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textMuted,
     marginTop: 2,
+  },
+  accountCard: {
+    padding: 16,
+    gap: 12,
+  },
+  accountCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  accountBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  accountBadgeVerified: {
+    backgroundColor: "rgba(46, 213, 115, 0.12)",
+    borderColor: "rgba(46, 213, 115, 0.3)",
+  },
+  accountBadgeText: {
+    fontFamily: FontFamily.mono,
+    fontSize: 9,
+    color: Colors.textMuted,
+    fontWeight: "700",
+    letterSpacing: 0.8,
+  },
+  accountCardSub: {
+    fontFamily: FontFamily.mono,
+    fontSize: 11,
+    color: Colors.textMuted,
+    flex: 1,
+    textAlign: "right",
+  },
+  accountDesc: {
+    fontFamily: FontFamily.sans,
+    fontSize: 12,
+    color: Colors.textMuted,
+    lineHeight: 17,
+  },
+  accountActionRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 2,
+  },
+  accountAuthBody: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  accountInfoCol: {
+    flex: 1,
+    gap: 2,
+  },
+  accountMetaKey: {
+    fontFamily: FontFamily.mono,
+    fontSize: 9,
+    color: Colors.textDim,
+    letterSpacing: 1,
+  },
+  accountMetaVal: {
+    fontFamily: FontFamily.mono,
+    fontSize: 14,
+    color: Colors.accent,
+    fontWeight: "700",
   },
 });
 

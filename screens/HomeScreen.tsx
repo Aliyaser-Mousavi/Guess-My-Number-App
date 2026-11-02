@@ -7,6 +7,7 @@ import Title from "@/components/ui/Title";
 import Colors from "@/constants/colors";
 import { FontFamily, Radius } from "@/constants/theme";
 import { useGame } from "@/context/GameProvider";
+import { CosmeticsService } from "@/services/cosmetics/CosmeticsService";
 import { LocalizationService } from "@/services/localization/LocalizationService";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
@@ -204,7 +205,7 @@ export default function HomeScreen({
               </View>
               <View style={[styles.levelTitleWrap, isRTL && { alignItems: "flex-end" }]}>
                 <Text style={styles.levelRankTitle}>
-                  {profile.displayName} • {profile.titleId ?? progression.rankTitle}
+                  {profile.displayName} • {CosmeticsService.getTitleName(profile.titleId) ?? progression.rankTitle}
                 </Text>
                 <View style={[styles.levelXpRow, isRTL && styles.rowReverse]}>
                   <View style={styles.miniXpTrack}>
@@ -403,7 +404,7 @@ export default function HomeScreen({
               <View style={[styles.navTextContainer, isRTL && { alignItems: "flex-end" }]}>
                 <Text style={styles.navLabel}>{t("profile")}</Text>
                 <Text style={styles.navMeta}>
-                  {profile.displayName} • {profile.titleId ?? progression.rankTitle}
+                  {profile.displayName} • {CosmeticsService.getTitleName(profile.titleId) ?? progression.rankTitle}
                 </Text>
               </View>
               <Ionicons

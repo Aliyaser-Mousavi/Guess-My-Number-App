@@ -351,4 +351,37 @@ export class CosmeticsService {
 
     return { nextCosmetics, nextProfile };
   }
+
+  /**
+   * Resolves a canonical title identifier to its formatted display title.
+   */
+  static getTitleName(titleId?: string): string {
+    if (!titleId) return "Apprentice Hunter";
+    const item = COSMETIC_CATALOG.find(
+      (c) => c.id === titleId && c.type === "title",
+    );
+    if (item) return item.name;
+
+    const canonicalMap: Record<string, string> = {
+      apprentice_hunter: "Apprentice Hunter",
+      number_seeker: "Number Seeker",
+      skilled_guesser: "Skilled Guesser",
+      code_breaker: "Code Breaker",
+      intuition_expert: "Intuition Expert",
+      oracle_whisperer: "Oracle Whisperer",
+      master_mind: "Master Mind",
+      arcade_legend: "Arcade Legend",
+      master_tactician: "Master Tactician",
+      grandmaster_mind: "Grandmaster Mind",
+      arcade_legend_title: "Arcade Sovereign",
+      arcade_sovereign: "Arcade Sovereign",
+      omniscient_oracle: "Omniscient Oracle",
+      living_legend: "Living Legend",
+      speed_demon_title: "Speed Demon",
+      flawless_hunter: "Flawless Mind",
+      champion: "Champion",
+    };
+
+    return canonicalMap[titleId] ?? titleId;
+  }
 }

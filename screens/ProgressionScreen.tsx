@@ -8,6 +8,7 @@ import Colors from "@/constants/colors";
 import { FontFamily, Radius } from "@/constants/theme";
 import { useGame } from "@/context/GameProvider";
 import { AchievementService } from "@/services/achievements/AchievementService";
+import { CosmeticsService } from "@/services/cosmetics/CosmeticsService";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
 import {
@@ -231,7 +232,7 @@ export default function ProgressionScreen({
               <View>
                 <Text style={styles.lockerBannerTitle}>Arcade Locker</Text>
                 <Text style={styles.lockerBannerSub}>
-                  Equipped: {profile.titleId ?? "Apprentice Hunter"}
+                  Equipped: {CosmeticsService.getTitleName(profile.titleId)}
                 </Text>
               </View>
             </View>
