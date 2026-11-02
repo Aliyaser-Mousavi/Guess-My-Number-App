@@ -2,7 +2,7 @@
 -- Migration: 0001_initial_profiles.sql
 -- Description: Create public.profiles table, triggers, immutability guards, view, and RLS
 -- Application: Guess My Number (Expo React Native)
--- ==============================================================================
+-- ======================================================================
 
 -- 1. Create Profiles Table linked to auth.users
 CREATE TABLE IF NOT EXISTS public.profiles (
@@ -112,8 +112,8 @@ BEGIN
   -- Client requests via Supabase PostgREST always carry auth.role() IN ('authenticated', 'anon').
   -- Clients can NEVER modify level, xp, or rank directly.
   IF (auth.role() = 'authenticated' OR auth.role() = 'anon') THEN
-    IF (OLD.level IS DISTINCT FROM NEW.level OR 
-        OLD.xp IS DISTINCT FROM NEW.xp OR 
+    IF (OLD.level IS DISTINCT FROM NEW.level OR
+        OLD.xp IS DISTINCT FROM NEW.xp OR
         OLD.rank IS DISTINCT FROM NEW.rank) THEN
       RAISE EXCEPTION 'Fields "level", "xp", and "rank" are server-authoritative and cannot be modified by client requests.';
     END IF;
@@ -200,14 +200,14 @@ BEGIN
   IF v_raw_username ~ '^[a-z0-9_]{3,20}$' THEN
     v_username := v_raw_username;
   ELSE
-    v_username := 'hunter_' || pg_catalog.substring(pg_catalog.replace(NEW.id::TEXT, '-', '') FROM 1 FOR 8);
+    v_username := 'hunter_' || pg_catalog.substr(pg_catalog.replace(NEW.id::TEXT, '-', ''), 1, 8);
   END IF;
 
   -- Ensure fallback display name
   IF pg_catalog.char_length(v_display_name) < 2 THEN
     v_display_name := 'Number Hunter';
   ELSIF pg_catalog.char_length(v_display_name) > 30 THEN
-    v_display_name := pg_catalog.substring(v_display_name FROM 1 FOR 30);
+    v_display_name := pg_catalog.substr(v_display_name, 1, 30);
   END IF;
 
   -- Validate starter avatar: only free starter avatars are permitted at registration
@@ -223,11 +223,11 @@ BEGIN
   -- Safe collision pre-check loop bounded to 5 attempts
   WHILE EXISTS (SELECT 1 FROM public.profiles WHERE username = v_username) AND v_retry_count < 5 LOOP
     v_retry_count := v_retry_count + 1;
-    v_username := 'hunter_' || pg_catalog.substring(pg_catalog.md5(pg_catalog.random()::TEXT) FROM 1 FOR 8);
+    v_username := 'hunter_' || pg_catalog.substr(pg_catalog.md5(pg_catalog.random()::TEXT), 1, 8);
   END LOOP;
 
   IF EXISTS (SELECT 1 FROM public.profiles WHERE username = v_username) THEN
-    v_username := 'hunter_' || pg_catalog.substring(pg_catalog.replace(NEW.id::TEXT, '-', '') FROM 1 FOR 10);
+    v_username := 'hunter_' || pg_catalog.substr(pg_catalog.replace(NEW.id::TEXT, '-', ''), 1, 10);
   END IF;
 
   -- Transactionally consistent insertion with concurrent collision recovery
@@ -257,7 +257,7 @@ BEGIN
     );
   EXCEPTION
     WHEN unique_violation THEN
-      v_username := 'hunter_' || pg_catalog.substring(pg_catalog.replace(NEW.id::TEXT, '-', '') FROM 1 FOR 12);
+      v_username := 'hunter_' || pg_catalog.substr(pg_catalog.replace(NEW.id::TEXT, '-', ''), 1, 12);
       INSERT INTO public.profiles (
         id,
         username,
@@ -321,6 +321,8 @@ CREATE POLICY "Users can update their own profile"
   WITH CHECK (auth.uid() = id);
 
 -- 9. Dedicated Public Profiles View
+-- Provides sanitized, read-only public access for leaderboards, friend search, and guest username checks.
+-- Excludes internal audit fields (updated_at).
 CREATE OR REPLACE VIEW public.public_profiles AS
   SELECT
     id,
@@ -334,4 +336,5 @@ CREATE OR REPLACE VIEW public.public_profiles AS
     created_at
   FROM public.profiles;
 
+-- Allow public read access to the sanitized view
 GRANT SELECT ON public.public_profiles TO anon, authenticated;
