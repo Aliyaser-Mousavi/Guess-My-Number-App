@@ -9,6 +9,11 @@ export type SyncStatus =
   | "pending"
   | "failed";
 
+export type SessionVerificationStatus =
+  | "client_reported"
+  | "server_verified"
+  | "legacy_unverified";
+
 export type CloudGameSession = {
   id?: string;
   user_id?: string;
@@ -31,8 +36,10 @@ export type CloudGameSession = {
   player2_name?: string | null;
   guesses: number[];
   replay_timeline?: any;
+  verification_status: SessionVerificationStatus;
   processed_for_rewards?: boolean;
   xp_awarded?: number;
+  client_played_at?: string;
   played_at?: string;
   created_at?: string;
 };
@@ -91,8 +98,19 @@ export type CloudRewardResult = {
   levels_gained: number;
 };
 
+export type SyncQueueItemStatus =
+  | "pending"
+  | "processing"
+  | "retry_wait"
+  | "failed_permanent"
+  | "completed";
+
 export type SyncQueueItem = {
   id: string;
+  ownerType: "authenticated" | "guest";
+  userId?: string | null;
+  deviceId?: string;
+  status: SyncQueueItemStatus;
   type: "session" | "settings" | "achievement" | "cosmetic";
   payload: any;
   attempts: number;

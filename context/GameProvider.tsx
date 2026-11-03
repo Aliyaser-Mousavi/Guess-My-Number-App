@@ -588,24 +588,20 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         console.error("[GameProvider] Error saving state:", err);
       });
 
-      // Server-authoritative Cloud Sync & Offline Queue
+      // Server-authoritative Cloud Sync & Offline Queue (SEC-01, SEC-03, SEC-06)
       if (user?.id) {
         CloudSyncService.uploadSession(historyRecord, user.id)
           .then((res) => {
-            if (res.success && res.reward) {
-              applyCloudSync({
-                cloudProfile: {
-                  level: res.reward.level,
-                  xp: res.reward.xp,
-                  rank: res.reward.rank,
-                },
-              });
-            } else if (!res.success) {
-              SyncQueueService.enqueue("session", historyRecord).catch(() => {});
+            if (!res.success) {
+              SyncQueueService.enqueue("session", historyRecord, user.id).catch(
+                () => {},
+              );
             }
           })
           .catch(() => {
-            SyncQueueService.enqueue("session", historyRecord).catch(() => {});
+            SyncQueueService.enqueue("session", historyRecord, user.id).catch(
+              () => {},
+            );
           });
       }
 
@@ -622,7 +618,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
       return finalResult;
     },
-    [activeSession, appState, applyCloudSync, computeScore, playSound, user],
+    [activeSession, appState, computeScore, playSound, user],
   );
 
   const isDailyDoneToday = appState.stats.lastDailyDate === getDailySeed();

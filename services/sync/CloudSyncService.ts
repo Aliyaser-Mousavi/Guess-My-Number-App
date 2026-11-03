@@ -6,8 +6,8 @@ import type {
   Settings,
 } from "@/types/game";
 import type {
-  CloudRewardResult,
   GuestMigrationResult,
+  SessionVerificationStatus,
   SyncResult,
 } from "@/types/sync";
 import { Platform } from "react-native";
@@ -15,17 +15,29 @@ import { SyncQueueService } from "./SyncQueueService";
 
 export class CloudSyncService {
   /**
-   * Uploads an individual game history record and executes server-authoritative reward processing.
+   * Uploads an individual game history record as a client-reported session (SEC-01 & SEC-03).
+   * Untrusted client-submitted fields are stored for personal history and replay only.
+   * They do NOT directly invoke reward processing or award verified server XP.
    */
   static async uploadSession(
     record: GameHistoryRecord,
     userId: string,
-  ): Promise<{ success: boolean; reward?: CloudRewardResult; error?: string }> {
+    verificationStatus: SessionVerificationStatus = "client_reported",
+  ): Promise<{
+    success: boolean;
+    verificationStatus?: SessionVerificationStatus;
+    error?: string;
+  }> {
     try {
+      const clientSessionId = record.sessionId || record.id;
+      const clientPlayedAt = new Date(
+        record.timestamp || Date.now(),
+      ).toISOString();
+
       // 1. Map client record to game_sessions table columns
       const sessionPayload = {
         user_id: userId,
-        client_session_id: record.sessionId || record.id,
+        client_session_id: clientSessionId,
         mode: record.mode,
         difficulty: record.difficulty,
         won: record.won,
@@ -44,63 +56,31 @@ export class CloudSyncService {
         player2_name: record.player2Name ?? null,
         guesses: record.guesses ?? [],
         replay_timeline: record.timeline ?? null,
-        played_at: new Date(record.timestamp || Date.now()).toISOString(),
+        verification_status: verificationStatus,
+        processed_for_rewards: false,
+        xp_awarded: 0,
+        client_played_at: clientPlayedAt,
       };
 
       // 2. Insert into game_sessions (idempotent ON CONFLICT ignore)
-      const { data: inserted, error: insertError } = await supabase
+      const { error: insertError } = await supabase
         .from("game_sessions")
-        .upsert(sessionPayload, { onConflict: "user_id,client_session_id" })
-        .select("id")
-        .single();
+        .upsert(sessionPayload, { onConflict: "user_id,client_session_id" });
 
       if (insertError) {
-        // If already exists, query its ID to allow reward check
+        // If already exists, return success idempotently
         if (insertError.code === "23505") {
-          const { data: existing } = await supabase
-            .from("game_sessions")
-            .select("id")
-            .eq("user_id", userId)
-            .eq("client_session_id", sessionPayload.client_session_id)
-            .maybeSingle();
-
-          if (existing?.id) {
-            return this.executeRewardProcess(existing.id);
-          }
+          return { success: true, verificationStatus };
         }
         return { success: false, error: insertError.message };
       }
 
-      if (!inserted?.id) {
-        return { success: false, error: "Failed to persist game session record." };
-      }
-
-      // 3. Process rewards server-side
-      return this.executeRewardProcess(inserted.id);
+      return { success: true, verificationStatus };
     } catch (err: any) {
-      return { success: false, error: err.message ?? "Failed to upload session." };
-    }
-  }
-
-  /**
-   * Calls the server RPC process_game_session_reward.
-   */
-  private static async executeRewardProcess(
-    sessionId: string,
-  ): Promise<{ success: boolean; reward?: CloudRewardResult; error?: string }> {
-    try {
-      const { data, error } = await supabase.rpc(
-        "process_game_session_reward",
-        { p_session_id: sessionId },
-      );
-
-      if (error) {
-        return { success: false, error: error.message };
-      }
-
-      return { success: true, reward: data as CloudRewardResult };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+      return {
+        success: false,
+        error: err.message ?? "Failed to upload session.",
+      };
     }
   }
 
@@ -117,7 +97,7 @@ export class CloudSyncService {
         .from("game_sessions")
         .select("*")
         .eq("user_id", userId)
-        .order("played_at", { ascending: false })
+        .order("client_played_at", { ascending: false })
         .range(offset, offset + limit - 1);
 
       if (error || !data) return [];
@@ -125,7 +105,9 @@ export class CloudSyncService {
       return data.map((row: any) => ({
         id: `cloud_${row.id}`,
         sessionId: row.client_session_id,
-        timestamp: new Date(row.played_at).getTime(),
+        timestamp: new Date(
+          row.client_played_at || row.created_at,
+        ).getTime(),
         won: row.won,
         rounds: row.rounds,
         score: row.score,
@@ -151,7 +133,8 @@ export class CloudSyncService {
   }
 
   /**
-   * Synchronizes user preferences with bidirectional field-level merge.
+   * Synchronizes user preferences with genuine bidirectional merge and remote update (SEC-05).
+   * Local changes are uploaded to Supabase, and remote changes are merged down.
    */
   static async syncSettings(
     localSettings: Settings,
@@ -164,8 +147,10 @@ export class CloudSyncService {
         .eq("user_id", userId)
         .maybeSingle();
 
+      const nowIso = new Date().toISOString();
+
       if (!cloudRow) {
-        // Upload local settings to cloud
+        // Initial upload of local settings
         await supabase.from("user_settings").insert({
           user_id: userId,
           theme_id: localSettings.themeId,
@@ -188,39 +173,72 @@ export class CloudSyncService {
           digit_format: localSettings.digitFormat,
           notifications: localSettings.notifications,
           version: 1,
+          client_modified_at: nowIso,
         });
         return { settings: localSettings, synced: true };
       }
 
-      // Merge: preserve cloud settings if present
+      // Bidirectional Field-Level Merge:
+      // Merge values and update Supabase with local edits so local changes are never lost
       const merged: Settings = {
-        ...localSettings,
-        themeId: (cloudRow.theme_id as any) ?? localSettings.themeId,
-        numberStyle: (cloudRow.number_style as any) ?? localSettings.numberStyle,
+        themeId: localSettings.themeId || (cloudRow.theme_id as any),
+        numberStyle:
+          localSettings.numberStyle || (cloudRow.number_style as any),
         numberAnimation:
-          (cloudRow.number_animation as any) ?? localSettings.numberAnimation,
-        textSize: (cloudRow.text_size as any) ?? localSettings.textSize,
-        haptics: cloudRow.haptics ?? localSettings.haptics,
+          localSettings.numberAnimation || (cloudRow.number_animation as any),
+        textSize: localSettings.textSize || (cloudRow.text_size as any),
+        haptics: localSettings.haptics ?? cloudRow.haptics,
         hapticIntensity:
-          (cloudRow.haptic_intensity as any) ?? localSettings.hapticIntensity,
-        soundEnabled: cloudRow.sound_enabled ?? localSettings.soundEnabled,
-        soundVolume: cloudRow.sound_volume ?? localSettings.soundVolume,
-        showProximity: cloudRow.show_proximity ?? localSettings.showProximity,
-        showTimer: cloudRow.show_timer ?? localSettings.showTimer,
-        showRangeBar: cloudRow.show_range_bar ?? localSettings.showRangeBar,
+          localSettings.hapticIntensity || (cloudRow.haptic_intensity as any),
+        soundEnabled: localSettings.soundEnabled ?? cloudRow.sound_enabled,
+        soundVolume: localSettings.soundVolume ?? cloudRow.sound_volume,
+        showProximity: localSettings.showProximity ?? cloudRow.show_proximity,
+        showTimer: localSettings.showTimer ?? cloudRow.show_timer,
+        showRangeBar: localSettings.showRangeBar ?? cloudRow.show_range_bar,
         tutorialCompleted:
-          cloudRow.tutorial_completed || localSettings.tutorialCompleted,
-        highContrast: cloudRow.high_contrast ?? localSettings.highContrast,
+          localSettings.tutorialCompleted || cloudRow.tutorial_completed,
+        highContrast: localSettings.highContrast ?? cloudRow.high_contrast,
         colorBlindMode:
-          (cloudRow.color_blind_mode as any) ?? localSettings.colorBlindMode,
-        reducedMotion: cloudRow.reduced_motion ?? localSettings.reducedMotion,
+          localSettings.colorBlindMode || (cloudRow.color_blind_mode as any),
+        reducedMotion: localSettings.reducedMotion ?? cloudRow.reduced_motion,
         leftHandedControls:
-          cloudRow.left_handed_controls ?? localSettings.leftHandedControls,
-        language: (cloudRow.language as any) ?? localSettings.language,
+          localSettings.leftHandedControls ?? cloudRow.left_handed_controls,
+        language: localSettings.language || (cloudRow.language as any),
         digitFormat:
-          (cloudRow.digit_format as any) ?? localSettings.digitFormat,
-        notifications: cloudRow.notifications ?? localSettings.notifications,
+          localSettings.digitFormat || (cloudRow.digit_format as any),
+        notifications: {
+          ...(cloudRow.notifications || {}),
+          ...(localSettings.notifications || {}),
+        },
       };
+
+      // Push merged settings back to Supabase so remote reflects latest local edits
+      await supabase
+        .from("user_settings")
+        .update({
+          theme_id: merged.themeId,
+          number_style: merged.numberStyle,
+          number_animation: merged.numberAnimation,
+          text_size: merged.textSize,
+          haptics: merged.haptics,
+          haptic_intensity: merged.hapticIntensity,
+          sound_enabled: merged.soundEnabled,
+          sound_volume: merged.soundVolume,
+          show_proximity: merged.showProximity,
+          show_timer: merged.showTimer,
+          show_range_bar: merged.showRangeBar,
+          tutorial_completed: merged.tutorialCompleted,
+          high_contrast: merged.highContrast,
+          color_blind_mode: merged.colorBlindMode,
+          reduced_motion: merged.reducedMotion,
+          left_handed_controls: merged.leftHandedControls,
+          language: merged.language,
+          digit_format: merged.digitFormat,
+          notifications: merged.notifications,
+          version: (cloudRow.version || 1) + 1,
+          client_modified_at: nowIso,
+        })
+        .eq("user_id", userId);
 
       return { settings: merged, synced: true };
     } catch {
@@ -229,7 +247,8 @@ export class CloudSyncService {
   }
 
   /**
-   * Synchronizes achievements via set union.
+   * Reads official server-verified achievements and merges down to local state (SEC-07).
+   * Direct client writes to user_achievements are blocked by database RLS.
    */
   static async syncAchievements(
     localUnlocked: string[],
@@ -244,20 +263,8 @@ export class CloudSyncService {
       const cloudSet = new Set(
         (cloudAchievements || []).map((a) => a.achievement_id),
       );
+      // Union server unlocks with local unlocks
       const unionSet = new Set([...localUnlocked, ...cloudSet]);
-
-      // Upload local unlocks missing from cloud
-      const missingOnCloud = localUnlocked.filter((id) => !cloudSet.has(id));
-      if (missingOnCloud.length > 0) {
-        const rows = missingOnCloud.map((achId) => ({
-          user_id: userId,
-          achievement_id: achId,
-          unlock_source: "offline_sync",
-        }));
-        await supabase.from("user_achievements").upsert(rows, {
-          onConflict: "user_id,achievement_id",
-        });
-      }
 
       return Array.from(unionSet);
     } catch {
@@ -266,7 +273,8 @@ export class CloudSyncService {
   }
 
   /**
-   * Synchronizes cosmetic unlocks with server inventory.
+   * Reads official server cosmetic inventory and merges into local state (SEC-02).
+   * Direct client insertion to user_cosmetic_unlocks is blocked by database RLS.
    */
   static async syncCosmetics(
     localCosmetics: CosmeticsState,
@@ -317,7 +325,10 @@ export class CloudSyncService {
   }
 
   /**
-   * Performs seamless guest-to-account data migration upon signup/login.
+   * Performs safe guest-to-account data migration (SEC-04 & SEC-09).
+   * Preserves historical stats in legacy_progress_imports (is_verified = false).
+   * Preserves historical matches as 'legacy_unverified' for local view/replay.
+   * NEVER executes reward processing or generates verified server XP for guest games!
    */
   static async migrateGuestToAccount(
     guestSnapshot: AppStateV2,
@@ -326,7 +337,7 @@ export class CloudSyncService {
     try {
       let legacyImported = false;
 
-      // 1. One-time legacy progress snapshot
+      // 1. One-time legacy progress snapshot with strictly is_verified = false
       const { data: existingImport } = await supabase
         .from("legacy_progress_imports")
         .select("id")
@@ -342,7 +353,8 @@ export class CloudSyncService {
             legacy_xp: guestSnapshot.progression.totalXp,
             legacy_level: guestSnapshot.progression.level,
             legacy_rank: guestSnapshot.progression.rankTitle,
-            unlocked_achievements: guestSnapshot.stats.unlockedAchievements || [],
+            unlocked_achievements:
+              guestSnapshot.stats.unlockedAchievements || [],
             unlocked_cosmetics: {
               avatars: guestSnapshot.cosmetics.unlockedAvatars,
               themes: guestSnapshot.cosmetics.unlockedThemes,
@@ -355,16 +367,21 @@ export class CloudSyncService {
         }
       }
 
-      // 2. Upload local game history sessions
+      // 2. Upload local game history as 'legacy_unverified' (SEC-04)
+      // Preserved for personal history, but NEVER processed for server XP
       let sessionsUploaded = 0;
       for (const record of guestSnapshot.history || []) {
-        const res = await this.uploadSession(record, userId);
+        const res = await this.uploadSession(
+          record,
+          userId,
+          "legacy_unverified",
+        );
         if (res.success) {
           sessionsUploaded += 1;
         }
       }
 
-      // 3. Sync achievements & cosmetics
+      // 3. Read server achievements & cosmetics (unioned downward)
       const mergedAchievements = await this.syncAchievements(
         guestSnapshot.stats.unlockedAchievements || [],
         userId,
@@ -375,7 +392,7 @@ export class CloudSyncService {
         userId,
       );
 
-      // 4. Sync settings
+      // 4. Bidirectional settings sync
       const settingsRes = await this.syncSettings(
         guestSnapshot.settings,
         userId,
@@ -406,14 +423,20 @@ export class CloudSyncService {
   }
 
   /**
-   * Processes all pending items in the offline queue.
+   * Processes all pending items in the offline queue for the given authenticated user (SEC-06).
+   * Fetches latest authoritative profile so local state stays in sync (SEC-12).
    */
-  static async processQueue(userId: string): Promise<number> {
-    const eligible = await SyncQueueService.getEligibleItems();
+  static async processQueue(userId: string): Promise<{
+    processedCount: number;
+    cloudProfile?: { level: number; xp: number; rank: string };
+  }> {
+    const eligible = await SyncQueueService.getEligibleItems(userId);
     let processedCount = 0;
 
     for (const item of eligible) {
       try {
+        await SyncQueueService.markProcessing(item.id);
+
         if (item.type === "session") {
           const res = await this.uploadSession(item.payload, userId);
           if (res.success) {
@@ -428,7 +451,29 @@ export class CloudSyncService {
       }
     }
 
-    return processedCount;
+    // Fetch authoritative cloud profile after queue flush (SEC-12)
+    let cloudProfile:
+      | { level: number; xp: number; rank: string }
+      | undefined;
+    try {
+      const { data } = await supabase
+        .from("profiles")
+        .select("level, xp, rank")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (data) {
+        cloudProfile = {
+          level: data.level,
+          xp: data.xp,
+          rank: data.rank,
+        };
+      }
+    } catch {
+      // ignore
+    }
+
+    return { processedCount, cloudProfile };
   }
 
   /**
@@ -451,42 +496,36 @@ export class CloudSyncService {
   }
 
   /**
-   * Performs an incremental synchronization pass.
+   * Performs a complete synchronization pass (SEC-05, SEC-06, SEC-12).
    */
   static async fullSync(
     currentState: AppStateV2,
     userId: string,
   ): Promise<SyncResult> {
     try {
-      // 1. Flush offline queue
-      const sessionsUploaded = await this.processQueue(userId);
+      // 1. Flush offline queue scoped to active user
+      const { processedCount: sessionsUploaded, cloudProfile } =
+        await this.processQueue(userId);
 
-      // 2. Sync settings
+      // 2. Bidirectional settings sync
       const { settings: mergedSettings } = await this.syncSettings(
         currentState.settings,
         userId,
       );
 
-      // 3. Sync achievements
+      // 3. Sync achievements (read-only from server)
       const mergedAchievements = await this.syncAchievements(
         currentState.stats.unlockedAchievements || [],
         userId,
       );
 
-      // 4. Sync cosmetics
+      // 4. Sync cosmetics (read-only from server)
       const mergedCosmetics = await this.syncCosmetics(
         currentState.cosmetics,
         userId,
       );
 
-      // 5. Fetch server-authoritative profile
-      const { data: cloudProfile } = await supabase
-        .from("profiles")
-        .select("level, xp, rank")
-        .eq("id", userId)
-        .maybeSingle();
-
-      // 6. Record metadata
+      // 5. Update metadata
       await this.updateSyncMetadata(userId);
 
       return {
@@ -496,13 +535,7 @@ export class CloudSyncService {
         mergedSettings,
         achievementsSynced: mergedAchievements.length,
         cosmeticsSynced: mergedCosmetics.unlockedAvatars.length,
-        cloudProfile: cloudProfile
-          ? {
-              level: cloudProfile.level,
-              xp: cloudProfile.xp,
-              rank: cloudProfile.rank,
-            }
-          : undefined,
+        cloudProfile,
       };
     } catch (err: any) {
       return {

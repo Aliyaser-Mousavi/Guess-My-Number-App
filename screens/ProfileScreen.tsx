@@ -51,7 +51,14 @@ export default function ProfileScreen({
     isRTL,
   } = useGame();
   const { user, isGuest, dbProfile, signOut } = useAuth();
-  const { syncStatus, lastSyncedAt, pendingCount, manualSync } = useSync();
+  const {
+    syncStatus,
+    lastSyncedAt,
+    pendingCount,
+    failedCount,
+    manualSync,
+    retryFailed,
+  } = useSync();
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -409,6 +416,30 @@ export default function ProfileScreen({
                     Sync Now
                   </PrimaryButton>
                 </View>
+
+                {failedCount > 0 && (
+                  <View style={[styles.failedRow, isRTL && styles.rowReverse]}>
+                    <Ionicons
+                      name="alert-circle-outline"
+                      size={14}
+                      color={Colors.coral}
+                    />
+                    <Text style={styles.failedText}>
+                      {failedCount} upload{failedCount === 1 ? "" : "s"} failed
+                      permanently.
+                    </Text>
+                    <Pressable
+                      onPress={async () => {
+                        buzz("light");
+                        playSound("button_click");
+                        await retryFailed();
+                      }}
+                      style={styles.retryLink}
+                    >
+                      <Text style={styles.retryLinkText}>Retry</Text>
+                    </Pressable>
+                  </View>
+                )}
               </>
             )}
           </Card>
@@ -1071,6 +1102,36 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.accent,
     flex: 1,
+  },
+  failedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(255, 82, 82, 0.08)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: "rgba(255, 82, 82, 0.2)",
+    marginTop: 4,
+  },
+  failedText: {
+    fontFamily: FontFamily.sans,
+    fontSize: 11,
+    color: Colors.coral,
+    flex: 1,
+  },
+  retryLink: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: Radius.xs,
+    backgroundColor: "rgba(255, 82, 82, 0.2)",
+  },
+  retryLinkText: {
+    fontFamily: FontFamily.mono,
+    fontSize: 10,
+    fontWeight: "700",
+    color: Colors.coral,
   },
 });
 

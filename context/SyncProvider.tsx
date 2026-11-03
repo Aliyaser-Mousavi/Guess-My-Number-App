@@ -23,8 +23,10 @@ export type SyncContextValue = {
   syncStatus: SyncStatus;
   lastSyncedAt: string | null;
   pendingCount: number;
+  failedCount: number;
   isOnline: boolean;
   manualSync: () => Promise<boolean>;
+  retryFailed: () => Promise<number>;
 };
 
 const SyncContext = createContext<SyncContextValue | null>(null);
@@ -36,12 +38,13 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [pendingCount, setPendingCount] = useState<number>(0);
+  const [failedCount, setFailedCount] = useState<number>(0);
   const [isOnline, setIsOnline] = useState<boolean>(true);
 
   const isSyncingRef = useRef(false);
   const prevUserIdRef = useRef<string | null>(null);
 
-  // Restore cached lastSyncedAt timestamp on startup
+  // Restore cached lastSyncedAt timestamp on startup & refresh queue counts
   useEffect(() => {
     AsyncStorage.getItem(LAST_SYNCED_STORAGE_KEY)
       .then((val) => {
@@ -49,10 +52,14 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       })
       .catch(() => {});
 
-    SyncQueueService.getPendingCount()
+    SyncQueueService.getPendingCount(user?.id)
       .then((count) => setPendingCount(count))
       .catch(() => {});
-  }, []);
+
+    SyncQueueService.getFailedCount(user?.id)
+      .then((count) => setFailedCount(count))
+      .catch(() => {});
+  }, [user?.id]);
 
   /**
    * Probes connectivity gracefully without third-party native modules.
@@ -90,12 +97,16 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const performSync = useCallback(async (): Promise<boolean> => {
     if (isSyncingRef.current) return false;
 
-    // Refresh pending count
-    const count = await SyncQueueService.getPendingCount();
-    setPendingCount(count);
+    // Refresh pending & failed counts scoped to user
+    const [pCount, fCount] = await Promise.all([
+      SyncQueueService.getPendingCount(user?.id),
+      SyncQueueService.getFailedCount(user?.id),
+    ]);
+    setPendingCount(pCount);
+    setFailedCount(fCount);
 
     if (!user?.id) {
-      setSyncStatus(count > 0 ? "pending" : "idle");
+      setSyncStatus(pCount > 0 ? "pending" : "idle");
       return true;
     }
 
@@ -112,7 +123,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
-      // 1. Full bidirectional sync
+      // 1. Full bidirectional sync (SEC-05, SEC-06, SEC-12)
       const fullRes = await CloudSyncService.fullSync(appState, user.id);
 
       // 2. Fetch remote cloud match history
@@ -134,8 +145,12 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       setLastSyncedAt(nowIso);
       await AsyncStorage.setItem(LAST_SYNCED_STORAGE_KEY, nowIso);
 
-      const nextPending = await SyncQueueService.getPendingCount();
+      const [nextPending, nextFailed] = await Promise.all([
+        SyncQueueService.getPendingCount(user.id),
+        SyncQueueService.getFailedCount(user.id),
+      ]);
       setPendingCount(nextPending);
+      setFailedCount(nextFailed);
 
       if (fullRes.success) {
         setSyncStatus(nextPending > 0 ? "pending" : "up_to_date");
@@ -154,7 +169,24 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   }, [user, checkConnectivity, appState, applyCloudSync]);
 
   /**
-   * Handles user authentication transitions and automatic guest migration.
+   * Manually retries all failed items.
+   */
+  const retryFailed = useCallback(async (): Promise<number> => {
+    const reset = await SyncQueueService.retryFailedItems(user?.id);
+    const [pCount, fCount] = await Promise.all([
+      SyncQueueService.getPendingCount(user?.id),
+      SyncQueueService.getFailedCount(user?.id),
+    ]);
+    setPendingCount(pCount);
+    setFailedCount(fCount);
+    if (reset > 0) {
+      performSync().catch(() => {});
+    }
+    return reset;
+  }, [user?.id, performSync]);
+
+  /**
+   * Handles user authentication transitions and automatic guest migration (SEC-04 & SEC-09).
    */
   useEffect(() => {
     if (!ready) return;
@@ -198,8 +230,12 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
             setLastSyncedAt(nowIso);
             await AsyncStorage.setItem(LAST_SYNCED_STORAGE_KEY, nowIso);
 
-            const nextPending = await SyncQueueService.getPendingCount();
+            const [nextPending, nextFailed] = await Promise.all([
+              SyncQueueService.getPendingCount(currentId),
+              SyncQueueService.getFailedCount(currentId),
+            ]);
             setPendingCount(nextPending);
+            setFailedCount(nextFailed);
             setSyncStatus("up_to_date");
           } else {
             console.warn(
@@ -237,20 +273,31 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   }, [user?.id, performSync]);
 
   /**
-   * Periodic queue processing for retry backoff.
+   * Periodic queue processing for retry backoff, scoped strictly to user (SEC-06 & SEC-12).
    */
   useEffect(() => {
     if (!user?.id) return;
 
     const interval = setInterval(async () => {
-      const pending = await SyncQueueService.getPendingCount();
+      const [pending, failed] = await Promise.all([
+        SyncQueueService.getPendingCount(user.id),
+        SyncQueueService.getFailedCount(user.id),
+      ]);
       setPendingCount(pending);
+      setFailedCount(failed);
 
       if (pending > 0 && !isSyncingRef.current) {
-        const eligible = await SyncQueueService.getEligibleItems();
+        const eligible = await SyncQueueService.getEligibleItems(user.id);
         if (eligible.length > 0) {
-          await CloudSyncService.processQueue(user.id);
-          const nextCount = await SyncQueueService.getPendingCount();
+          // Process queue and update local state with returned cloud profile (SEC-12)
+          const { cloudProfile } = await CloudSyncService.processQueue(
+            user.id,
+          );
+          if (cloudProfile) {
+            applyCloudSync({ cloudProfile });
+          }
+
+          const nextCount = await SyncQueueService.getPendingCount(user.id);
           setPendingCount(nextCount);
           if (nextCount === 0 && syncStatus !== "syncing") {
             setSyncStatus("up_to_date");
@@ -260,17 +307,27 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     }, 15000); // 15 second cycle
 
     return () => clearInterval(interval);
-  }, [user?.id, syncStatus]);
+  }, [user?.id, syncStatus, applyCloudSync]);
 
   const value = useMemo(
     () => ({
       syncStatus,
       lastSyncedAt,
       pendingCount,
+      failedCount,
       isOnline,
       manualSync: performSync,
+      retryFailed,
     }),
-    [syncStatus, lastSyncedAt, pendingCount, isOnline, performSync],
+    [
+      syncStatus,
+      lastSyncedAt,
+      pendingCount,
+      failedCount,
+      isOnline,
+      performSync,
+      retryFailed,
+    ],
   );
 
   return <SyncContext.Provider value={value}>{children}</SyncContext.Provider>;
