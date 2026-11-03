@@ -5,6 +5,7 @@ import {
   type DifficultyId,
   type GameMode,
 } from "@/constants/gameConfig";
+import { useAuth } from "@/context/AuthProvider";
 import {
   GameSessionManager,
   HistoryService,
@@ -17,6 +18,8 @@ import {
   AchievementService,
   CosmeticsService,
   MissionService,
+  CloudSyncService,
+  SyncQueueService,
   EXPANDED_ACHIEVEMENTS,
   type DifficultyRecommendation,
   type CreateSessionParams,
@@ -122,11 +125,26 @@ type GameContextValue = {
   formatNumber: (val: number | string | null | undefined) => string;
   formatDate: (val: number | Date) => string;
   isRTL: boolean;
+
+  // Group 07B Additions (Cloud Sync)
+  appState: AppStateV2;
+  applyCloudSync: (patch: {
+    settings?: Settings;
+    achievements?: string[];
+    cosmetics?: CosmeticsState;
+    cloudProfile?: {
+      level: number;
+      xp: number;
+      rank: string;
+    };
+    cloudHistory?: GameHistoryRecord[];
+  }) => void;
 };
 
 const GameContext = createContext<GameContextValue | null>(null);
 
 export function GameProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const [appState, setAppState] = useState<AppStateV2>(DEFAULT_STATE_V2);
   const [ready, setReady] = useState(false);
   const [newlyUnlocked, setNewlyUnlocked] = useState<string[]>([]);
@@ -315,6 +333,95 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // Server-authoritative Cloud Sync applicator
+  const applyCloudSync = useCallback(
+    (patch: {
+      settings?: Settings;
+      achievements?: string[];
+      cosmetics?: CosmeticsState;
+      cloudProfile?: {
+        level: number;
+        xp: number;
+        rank: string;
+      };
+      cloudHistory?: GameHistoryRecord[];
+    }) => {
+      setAppState((prev) => {
+        let changed = false;
+        let nextSettings = prev.settings;
+        if (patch.settings) {
+          nextSettings = patch.settings;
+          changed = true;
+        }
+
+        let nextStats = prev.stats;
+        if (patch.achievements && patch.achievements.length > 0) {
+          const mergedAch = Array.from(
+            new Set([...prev.stats.unlockedAchievements, ...patch.achievements]),
+          );
+          if (mergedAch.length !== prev.stats.unlockedAchievements.length) {
+            nextStats = { ...prev.stats, unlockedAchievements: mergedAch };
+            changed = true;
+          }
+        }
+
+        let nextCosmetics = prev.cosmetics;
+        if (patch.cosmetics) {
+          nextCosmetics = patch.cosmetics;
+          changed = true;
+        }
+
+        let nextProgression = prev.progression;
+        let nextProfile = prev.profile;
+        if (patch.cloudProfile) {
+          if (
+            patch.cloudProfile.level !== prev.progression.level ||
+            patch.cloudProfile.xp !== prev.progression.totalXp
+          ) {
+            nextProgression = ProgressionService.fromLevelAndXp(
+              patch.cloudProfile.level,
+              patch.cloudProfile.xp,
+              patch.cloudProfile.rank || prev.progression.rankTitle,
+            );
+            changed = true;
+          }
+        }
+
+        let nextHistory = prev.history;
+        if (patch.cloudHistory && patch.cloudHistory.length > 0) {
+          const existingIds = new Set(
+            prev.history.map((h) => h.sessionId || h.id),
+          );
+          const newItems = patch.cloudHistory.filter(
+            (h) => !existingIds.has(h.sessionId || h.id),
+          );
+          if (newItems.length > 0) {
+            nextHistory = [...newItems, ...prev.history].sort(
+              (a, b) => b.timestamp - a.timestamp,
+            );
+            changed = true;
+          }
+        }
+
+        if (!changed) return prev;
+
+        const nextState: AppStateV2 = {
+          ...prev,
+          settings: nextSettings,
+          stats: nextStats,
+          cosmetics: nextCosmetics,
+          progression: nextProgression,
+          profile: nextProfile,
+          history: nextHistory,
+        };
+
+        StorageService.saveState(nextState).catch(() => {});
+        return nextState;
+      });
+    },
+    [],
+  );
+
   // Record completed game with duplicate guard, progression XP, and history logging
   const recordGame = useCallback(
     (
@@ -481,6 +588,27 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         console.error("[GameProvider] Error saving state:", err);
       });
 
+      // Server-authoritative Cloud Sync & Offline Queue
+      if (user?.id) {
+        CloudSyncService.uploadSession(historyRecord, user.id)
+          .then((res) => {
+            if (res.success && res.reward) {
+              applyCloudSync({
+                cloudProfile: {
+                  level: res.reward.level,
+                  xp: res.reward.xp,
+                  rank: res.reward.rank,
+                },
+              });
+            } else if (!res.success) {
+              SyncQueueService.enqueue("session", historyRecord).catch(() => {});
+            }
+          })
+          .catch(() => {
+            SyncQueueService.enqueue("session", historyRecord).catch(() => {});
+          });
+      }
+
       if (freshAchievements.length > 0) {
         setNewlyUnlocked(freshAchievements);
         playSound("achievement");
@@ -494,7 +622,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
       return finalResult;
     },
-    [activeSession, appState, computeScore, playSound],
+    [activeSession, appState, applyCloudSync, computeScore, playSound, user],
   );
 
   const isDailyDoneToday = appState.stats.lastDailyDate === getDailySeed();
@@ -697,16 +825,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       formatNumber,
       formatDate,
       isRTL,
+      appState,
+      applyCloudSync,
     }),
     [
-      appState.stats,
-      appState.settings,
-      appState.profile,
-      appState.progression,
-      appState.missions,
-      appState.cosmetics,
-      appState.history,
-      appState.dailyHistory,
+      appState,
       competitiveRank,
       personalBests,
       activeSession,
@@ -735,6 +858,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       formatNumber,
       formatDate,
       isRTL,
+      applyCloudSync,
     ],
   );
 

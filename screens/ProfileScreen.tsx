@@ -10,6 +10,7 @@ import Colors from "@/constants/colors";
 import { FontFamily, Radius } from "@/constants/theme";
 import { useAuth } from "@/context/AuthProvider";
 import { useGame } from "@/context/GameProvider";
+import { useSync } from "@/context/SyncProvider";
 import { EXPANDED_ACHIEVEMENTS } from "@/services/achievements/AchievementService";
 import { CosmeticsService } from "@/services/cosmetics/CosmeticsService";
 import { LocalizationService } from "@/services/localization/LocalizationService";
@@ -50,9 +51,11 @@ export default function ProfileScreen({
     isRTL,
   } = useGame();
   const { user, isGuest, dbProfile, signOut } = useAuth();
+  const { syncStatus, lastSyncedAt, pendingCount, manualSync } = useSync();
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [isSyncingManual, setIsSyncingManual] = useState(false);
 
   const winRate =
     stats.gamesPlayed === 0
@@ -247,6 +250,19 @@ export default function ProfileScreen({
                   Link your local progress to a Hunter account. Claim your unique
                   username and prepare for cloud backup across devices!
                 </Text>
+                {pendingCount > 0 && (
+                  <View style={[styles.guestPendingRow, isRTL && styles.rowReverse]}>
+                    <Ionicons
+                      name="cloud-upload-outline"
+                      size={14}
+                      color={Colors.accent}
+                    />
+                    <Text style={styles.guestPendingText}>
+                      {pendingCount} session{pendingCount === 1 ? "" : "s"} stored
+                      locally. Sign in to sync rewards!
+                    </Text>
+                  </View>
+                )}
                 <View style={[styles.accountActionRow, isRTL && styles.rowReverse]}>
                   <PrimaryButton
                     variant="accent"
@@ -269,32 +285,131 @@ export default function ProfileScreen({
                 </View>
               </>
             ) : (
-              <View style={[styles.accountAuthBody, isRTL && styles.rowReverse]}>
-                <View style={[styles.accountInfoCol, isRTL && { alignItems: "flex-end" }]}>
-                  <Text style={styles.accountMetaKey}>ACCOUNT HANDLE</Text>
-                  <Text style={styles.accountMetaVal}>
-                    @{dbProfile?.username ?? "hunter"}
-                  </Text>
+              <>
+                <View style={[styles.accountAuthBody, isRTL && styles.rowReverse]}>
+                  <View style={[styles.accountInfoCol, isRTL && { alignItems: "flex-end" }]}>
+                    <Text style={styles.accountMetaKey}>ACCOUNT HANDLE</Text>
+                    <Text style={styles.accountMetaVal}>
+                      @{dbProfile?.username ?? "hunter"}
+                    </Text>
+                  </View>
+                  <PrimaryButton
+                    variant="secondary"
+                    size="sm"
+                    onPress={async () => {
+                      buzz("light");
+                      playSound("button_click");
+                      await signOut();
+                    }}
+                    icon={
+                      <Ionicons
+                        name="log-out-outline"
+                        size={16}
+                        color={Colors.text}
+                      />
+                    }
+                  >
+                    Sign Out
+                  </PrimaryButton>
                 </View>
-                <PrimaryButton
-                  variant="secondary"
-                  size="sm"
-                  onPress={async () => {
-                    buzz("light");
-                    playSound("button_click");
-                    await signOut();
-                  }}
-                  icon={
-                    <Ionicons
-                      name="log-out-outline"
-                      size={16}
-                      color={Colors.text}
-                    />
-                  }
-                >
-                  Sign Out
-                </PrimaryButton>
-              </View>
+
+                <View style={styles.accountDivider} />
+
+                {/* Cloud Save & Sync Status Section */}
+                <View style={[styles.syncSection, isRTL && styles.rowReverse]}>
+                  <View style={[styles.syncStatusWrap, isRTL && { alignItems: "flex-end" }]}>
+                    <View style={[styles.syncBadgeRow, isRTL && styles.rowReverse]}>
+                      <Ionicons
+                        name={
+                          syncStatus === "syncing"
+                            ? "sync"
+                            : syncStatus === "up_to_date"
+                            ? "checkmark-circle"
+                            : syncStatus === "pending"
+                            ? "cloud-upload"
+                            : syncStatus === "offline"
+                            ? "cloud-offline"
+                            : syncStatus === "failed"
+                            ? "alert-circle"
+                            : "cloud-done"
+                        }
+                        size={14}
+                        color={
+                          syncStatus === "up_to_date"
+                            ? Colors.mint
+                            : syncStatus === "syncing"
+                            ? Colors.primary
+                            : syncStatus === "pending"
+                            ? Colors.accent
+                            : syncStatus === "failed"
+                            ? Colors.coral
+                            : Colors.textMuted
+                        }
+                      />
+                      <Text
+                        style={[
+                          styles.syncBadgeLabel,
+                          {
+                            color:
+                              syncStatus === "up_to_date"
+                                ? Colors.mint
+                                : syncStatus === "syncing"
+                                ? Colors.primary
+                                : syncStatus === "pending"
+                                ? Colors.accent
+                                : syncStatus === "failed"
+                                ? Colors.coral
+                                : Colors.textMuted,
+                          },
+                        ]}
+                      >
+                        {syncStatus === "syncing"
+                          ? "SYNCING NOW..."
+                          : syncStatus === "up_to_date"
+                          ? "CLOUD SYNCHRONIZED"
+                          : syncStatus === "pending"
+                          ? `${pendingCount} PENDING UPLOAD${pendingCount === 1 ? "" : "S"}`
+                          : syncStatus === "offline"
+                          ? "OFFLINE (QUEUED)"
+                          : syncStatus === "failed"
+                          ? "SYNC FAILED (RETRY)"
+                          : "CLOUD BACKUP READY"}
+                      </Text>
+                    </View>
+                    <Text style={styles.syncLastTime}>
+                      {syncStatus === "syncing"
+                        ? "Uploading matches & rewards..."
+                        : `Last synced: ${formatLastSynced(lastSyncedAt)}`}
+                    </Text>
+                  </View>
+
+                  <PrimaryButton
+                    variant="accent"
+                    size="sm"
+                    loading={isSyncingManual || syncStatus === "syncing"}
+                    disabled={isSyncingManual || syncStatus === "syncing"}
+                    onPress={async () => {
+                      buzz("light");
+                      playSound("button_click");
+                      setIsSyncingManual(true);
+                      try {
+                        await manualSync();
+                      } finally {
+                        setIsSyncingManual(false);
+                      }
+                    }}
+                    icon={
+                      <Ionicons
+                        name="sync-outline"
+                        size={14}
+                        color={Colors.bg}
+                      />
+                    }
+                  >
+                    Sync Now
+                  </PrimaryButton>
+                </View>
+              </>
             )}
           </Card>
 
@@ -509,6 +624,16 @@ export default function ProfileScreen({
       </SafeAreaView>
     </ScreenBackground>
   );
+}
+
+function formatLastSynced(isoStr: string | null): string {
+  if (!isoStr) return "Never synced";
+  try {
+    const d = new Date(isoStr);
+    return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  } catch {
+    return "Recently";
+  }
 }
 
 function RecordRow({
@@ -897,6 +1022,55 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.accent,
     fontWeight: "700",
+  },
+  accountDivider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginVertical: 4,
+  },
+  syncSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  syncStatusWrap: {
+    flex: 1,
+    gap: 3,
+  },
+  syncBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  syncBadgeLabel: {
+    fontFamily: FontFamily.mono,
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.6,
+  },
+  syncLastTime: {
+    fontFamily: FontFamily.sans,
+    fontSize: 11,
+    color: Colors.textMuted,
+  },
+  guestPendingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(255, 184, 0, 0.08)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: "rgba(255, 184, 0, 0.2)",
+    marginTop: 4,
+  },
+  guestPendingText: {
+    fontFamily: FontFamily.sans,
+    fontSize: 11,
+    color: Colors.accent,
+    flex: 1,
   },
 });
 

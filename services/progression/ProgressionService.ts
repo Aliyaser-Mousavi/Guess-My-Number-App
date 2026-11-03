@@ -126,6 +126,30 @@ export class ProgressionService {
   }
 
   /**
+   * Reconstructs full PlayerProgression given authoritative level and total XP.
+   */
+  static fromLevelAndXp(
+    level: number,
+    totalXp: number,
+    rankTitle?: string,
+  ): PlayerProgression {
+    const nextLevelXp = this.getXpThresholdForLevel(level);
+    let cumulative = 0;
+    for (let l = 1; l < level; l++) {
+      cumulative += this.getXpThresholdForLevel(l);
+    }
+    const currentXp = Math.max(0, Math.min(totalXp - cumulative, nextLevelXp));
+
+    return {
+      level,
+      currentXp,
+      nextLevelXp,
+      totalXp,
+      rankTitle: rankTitle || this.getRankTitle(level),
+    };
+  }
+
+  /**
    * Prestige titles awarded based on player level.
    */
   static getRankTitle(level: number): string {

@@ -1,4 +1,5 @@
 import type { DifficultyId, GameMode } from "@/constants/gameConfig";
+export type { DifficultyId, GameMode };
 
 export type AppScreen =
   | "home"
