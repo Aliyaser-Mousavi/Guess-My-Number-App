@@ -20,6 +20,7 @@ import {
   MissionService,
   CloudSyncService,
   SyncQueueService,
+  SettingsSyncManager,
   EXPANDED_ACHIEVEMENTS,
   type DifficultyRecommendation,
   type CreateSessionParams,
@@ -61,6 +62,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -154,6 +156,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     levelsGained: number;
   } | null>(null);
 
+  const userIdRef = useRef<string | null>(user?.id ?? null);
+  useEffect(() => {
+    userIdRef.current = user?.id ?? null;
+  }, [user?.id]);
+
   // Initialize and migrate storage on startup
   useEffect(() => {
     let isMounted = true;
@@ -186,9 +193,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Update Settings with persistence
+  // Update Settings with persistence and dirty-field tracking (SEC-05)
   const updateSettings = useCallback(
     (patch: Partial<Settings>) => {
+      SettingsSyncManager.markDirty(patch, userIdRef.current).catch(() => {});
       setAppState((prev) => {
         const nextSettings: Settings = { ...prev.settings, ...patch };
         if (patch.soundEnabled !== undefined) {
@@ -374,10 +382,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         let nextProgression = prev.progression;
         let nextProfile = prev.profile;
         if (patch.cloudProfile) {
-          if (
-            patch.cloudProfile.level !== prev.progression.level ||
-            patch.cloudProfile.xp !== prev.progression.totalXp
-          ) {
+          // Progression monotonically advances; never regress local progress from unverified lower cloud state
+          const isHigher =
+            patch.cloudProfile.level > prev.progression.level ||
+            (patch.cloudProfile.level === prev.progression.level &&
+              patch.cloudProfile.xp > prev.progression.totalXp);
+          if (isHigher) {
             nextProgression = ProgressionService.fromLevelAndXp(
               patch.cloudProfile.level,
               patch.cloudProfile.xp,

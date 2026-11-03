@@ -18,5 +18,6 @@ export * from "./localization/LocalizationService";
 export * from "./notifications/NotificationService";
 export * from "./auth/AuthService";
 export * from "./sync/SyncQueueService";
+export * from "./sync/SettingsSyncManager";
 export * from "./sync/CloudSyncService";
 export * from "@/lib/supabase";

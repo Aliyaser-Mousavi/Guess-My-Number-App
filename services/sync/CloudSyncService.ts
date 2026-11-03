@@ -12,6 +12,11 @@ import type {
 } from "@/types/sync";
 import { Platform } from "react-native";
 import { SyncQueueService } from "./SyncQueueService";
+import {
+  SettingsSyncManager,
+  dbColumnsToSettings,
+  settingsToDbColumns,
+} from "./SettingsSyncManager";
 
 export class CloudSyncService {
   /**
@@ -134,111 +139,191 @@ export class CloudSyncService {
 
   /**
    * Synchronizes user preferences with genuine bidirectional merge and remote update (SEC-05).
-   * Local changes are uploaded to Supabase, and remote changes are merged down.
+   * Uses dirty-field tracking so unedited local defaults never overwrite existing cloud settings,
+   * while explicitly modified user settings are reliably uploaded.
    */
   static async syncSettings(
     localSettings: Settings,
     userId: string,
   ): Promise<{ settings: Settings; synced: boolean }> {
     try {
-      const { data: cloudRow } = await supabase
+      const dirtyFields = await SettingsSyncManager.getDirtyFields(userId);
+      const dirtyKeys = Object.keys(dirtyFields) as (keyof Settings)[];
+      const hasDirty = dirtyKeys.length > 0;
+
+      const { data: cloudRow, error: fetchErr } = await supabase
         .from("user_settings")
         .select("*")
         .eq("user_id", userId)
         .maybeSingle();
 
+      if (fetchErr) throw fetchErr;
+
       const nowIso = new Date().toISOString();
 
       if (!cloudRow) {
         // Initial upload of local settings
-        await supabase.from("user_settings").insert({
+        const initialPayload = {
           user_id: userId,
-          theme_id: localSettings.themeId,
-          number_style: localSettings.numberStyle,
-          number_animation: localSettings.numberAnimation,
-          text_size: localSettings.textSize,
-          haptics: localSettings.haptics,
-          haptic_intensity: localSettings.hapticIntensity,
-          sound_enabled: localSettings.soundEnabled,
-          sound_volume: localSettings.soundVolume,
-          show_proximity: localSettings.showProximity,
-          show_timer: localSettings.showTimer,
-          show_range_bar: localSettings.showRangeBar,
-          tutorial_completed: localSettings.tutorialCompleted,
-          high_contrast: localSettings.highContrast,
-          color_blind_mode: localSettings.colorBlindMode,
-          reduced_motion: localSettings.reducedMotion,
-          left_handed_controls: localSettings.leftHandedControls,
-          language: localSettings.language,
-          digit_format: localSettings.digitFormat,
-          notifications: localSettings.notifications,
+          ...settingsToDbColumns(localSettings),
           version: 1,
           client_modified_at: nowIso,
-        });
+        };
+        const { error: insertErr } = await supabase
+          .from("user_settings")
+          .insert(initialPayload);
+
+        if (insertErr) {
+          // Graceful handling of initial row insert race condition (Test E)
+          // If another device inserted simultaneously, refetch and proceed to OCC update
+          if (
+            insertErr.code === "23505" ||
+            insertErr.message?.includes("duplicate key") ||
+            insertErr.message?.includes("unique")
+          ) {
+            const { data: racedRow } = await supabase
+              .from("user_settings")
+              .select("*")
+              .eq("user_id", userId)
+              .maybeSingle();
+
+            if (racedRow) {
+              const racedRemote = dbColumnsToSettings(racedRow);
+              const racedMerged: Settings = {
+                ...localSettings,
+                ...racedRemote,
+              };
+              for (const k of dirtyKeys) {
+                (racedMerged as any)[k] = dirtyFields[k];
+              }
+
+              if (hasDirty) {
+                const inFlightSnapshot = { ...dirtyFields };
+                const retryPayload = {
+                  ...settingsToDbColumns(inFlightSnapshot),
+                  client_modified_at: new Date().toISOString(),
+                };
+                const { data: retryRows, error: retryErr } = await supabase
+                  .from("user_settings")
+                  .update(retryPayload)
+                  .eq("user_id", userId)
+                  .eq("version", racedRow.version || 1)
+                  .select();
+
+                if (retryErr || !retryRows || retryRows.length === 0) {
+                  return { settings: racedMerged, synced: false };
+                }
+                await SettingsSyncManager.clearAcknowledgedDirty(
+                  inFlightSnapshot,
+                  userId,
+                );
+              }
+              return { settings: racedMerged, synced: true };
+            }
+          }
+          throw insertErr;
+        }
+
+        if (hasDirty) {
+          await SettingsSyncManager.clearAcknowledgedDirty(dirtyFields, userId);
+        }
         return { settings: localSettings, synced: true };
       }
 
-      // Bidirectional Field-Level Merge:
-      // Merge values and update Supabase with local edits so local changes are never lost
+      // Remote cloud row exists
+      const remoteSettings = dbColumnsToSettings(cloudRow);
+
+      // Merge: Non-dirty fields adopt cloud settings; dirty fields retain local changes
       const merged: Settings = {
-        themeId: localSettings.themeId || (cloudRow.theme_id as any),
-        numberStyle:
-          localSettings.numberStyle || (cloudRow.number_style as any),
-        numberAnimation:
-          localSettings.numberAnimation || (cloudRow.number_animation as any),
-        textSize: localSettings.textSize || (cloudRow.text_size as any),
-        haptics: localSettings.haptics ?? cloudRow.haptics,
-        hapticIntensity:
-          localSettings.hapticIntensity || (cloudRow.haptic_intensity as any),
-        soundEnabled: localSettings.soundEnabled ?? cloudRow.sound_enabled,
-        soundVolume: localSettings.soundVolume ?? cloudRow.sound_volume,
-        showProximity: localSettings.showProximity ?? cloudRow.show_proximity,
-        showTimer: localSettings.showTimer ?? cloudRow.show_timer,
-        showRangeBar: localSettings.showRangeBar ?? cloudRow.show_range_bar,
-        tutorialCompleted:
-          localSettings.tutorialCompleted || cloudRow.tutorial_completed,
-        highContrast: localSettings.highContrast ?? cloudRow.high_contrast,
-        colorBlindMode:
-          localSettings.colorBlindMode || (cloudRow.color_blind_mode as any),
-        reducedMotion: localSettings.reducedMotion ?? cloudRow.reduced_motion,
-        leftHandedControls:
-          localSettings.leftHandedControls ?? cloudRow.left_handed_controls,
-        language: localSettings.language || (cloudRow.language as any),
-        digitFormat:
-          localSettings.digitFormat || (cloudRow.digit_format as any),
-        notifications: {
-          ...(cloudRow.notifications || {}),
-          ...(localSettings.notifications || {}),
-        },
+        ...localSettings,
+        ...remoteSettings,
       };
 
-      // Push merged settings back to Supabase so remote reflects latest local edits
-      await supabase
-        .from("user_settings")
-        .update({
-          theme_id: merged.themeId,
-          number_style: merged.numberStyle,
-          number_animation: merged.numberAnimation,
-          text_size: merged.textSize,
-          haptics: merged.haptics,
-          haptic_intensity: merged.hapticIntensity,
-          sound_enabled: merged.soundEnabled,
-          sound_volume: merged.soundVolume,
-          show_proximity: merged.showProximity,
-          show_timer: merged.showTimer,
-          show_range_bar: merged.showRangeBar,
-          tutorial_completed: merged.tutorialCompleted,
-          high_contrast: merged.highContrast,
-          color_blind_mode: merged.colorBlindMode,
-          reduced_motion: merged.reducedMotion,
-          left_handed_controls: merged.leftHandedControls,
-          language: merged.language,
-          digit_format: merged.digitFormat,
-          notifications: merged.notifications,
-          version: (cloudRow.version || 1) + 1,
+      for (const k of dirtyKeys) {
+        (merged as any)[k] = dirtyFields[k];
+      }
+
+      // If user had local modifications, upload only the dirty fields with optimistic concurrency control
+      if (hasDirty) {
+        const inFlightSnapshot = { ...dirtyFields };
+        const expectedVersion = cloudRow.version || 1;
+        const updatePayload = {
+          ...settingsToDbColumns(inFlightSnapshot),
           client_modified_at: nowIso,
-        })
-        .eq("user_id", userId);
+        };
+
+        // Atomic Optimistic Concurrency Update
+        // Uses database-managed versioning; matches user_id AND expectedVersion
+        const { data: updatedRows, error: updateErr } = await supabase
+          .from("user_settings")
+          .update(updatePayload)
+          .eq("user_id", userId)
+          .eq("version", expectedVersion)
+          .select();
+
+        if (updateErr) throw updateErr;
+
+        // If 0 rows updated, a concurrency conflict occurred (stale version detected)
+        if (!updatedRows || updatedRows.length === 0) {
+          console.warn(
+            `[CloudSyncService] Optimistic concurrency conflict on version ${expectedVersion}. Retrying with fresh conflict-resolution pass.`,
+          );
+
+          // 1. Fetch fresh server row
+          const { data: freshCloudRow, error: freshErr } = await supabase
+            .from("user_settings")
+            .select("*")
+            .eq("user_id", userId)
+            .maybeSingle();
+
+          if (freshErr || !freshCloudRow) {
+            // Cannot reach server or fetch fresh row: preserve dirty fields and return
+            return { settings: merged, synced: false };
+          }
+
+          const freshRemoteSettings = dbColumnsToSettings(freshCloudRow);
+          // 2. Fresh merge: non-dirty adopt fresh server state, dirty fields retain local changes
+          const reMerged: Settings = {
+            ...localSettings,
+            ...freshRemoteSettings,
+          };
+          for (const k of dirtyKeys) {
+            (reMerged as any)[k] = inFlightSnapshot[k];
+          }
+
+          // 3. Retry update against fresh server version
+          const retryExpectedVersion = freshCloudRow.version;
+          const retryPayload = {
+            ...settingsToDbColumns(inFlightSnapshot),
+            client_modified_at: new Date().toISOString(),
+          };
+
+          const { data: retryRows, error: retryErr } = await supabase
+            .from("user_settings")
+            .update(retryPayload)
+            .eq("user_id", userId)
+            .eq("version", retryExpectedVersion)
+            .select();
+
+          if (retryErr || !retryRows || retryRows.length === 0) {
+            // Still in conflict or network drop: NEVER clear dirty fields
+            return { settings: reMerged, synced: false };
+          }
+
+          // Acknowledged on retry! Clear acknowledged dirty fields
+          await SettingsSyncManager.clearAcknowledgedDirty(
+            inFlightSnapshot,
+            userId,
+          );
+          return { settings: reMerged, synced: true };
+        }
+
+        // Successfully updated on first attempt!
+        await SettingsSyncManager.clearAcknowledgedDirty(
+          inFlightSnapshot,
+          userId,
+        );
+      }
 
       return { settings: merged, synced: true };
     } catch {
@@ -392,7 +477,8 @@ export class CloudSyncService {
         userId,
       );
 
-      // 4. Bidirectional settings sync
+      // 4. Transfer guest dirty settings to user, then bidirectional settings sync
+      await SettingsSyncManager.transferGuestDirtyFields(userId);
       const settingsRes = await this.syncSettings(
         guestSnapshot.settings,
         userId,
@@ -407,6 +493,7 @@ export class CloudSyncService {
         achievementsSynced: mergedAchievements.length,
         cosmeticsSynced: mergedCosmetics.unlockedAvatars.length,
         settingsMerged: settingsRes.synced,
+        mergedSettings: settingsRes.settings,
         legacyImported,
       };
     } catch (err: any) {

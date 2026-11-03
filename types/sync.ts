@@ -126,6 +126,7 @@ export type GuestMigrationResult = {
   cosmeticsSynced: number;
   settingsMerged: boolean;
   legacyImported: boolean;
+  mergedSettings?: Settings;
   error?: string;
 };
 

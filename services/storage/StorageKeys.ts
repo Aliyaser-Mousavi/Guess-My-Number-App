@@ -6,5 +6,6 @@ export const StorageKeys = {
   LEGACY_STATS: "@gmn/stats",
   LEGACY_SETTINGS: "@gmn/settings",
   CORRUPT_BACKUP_PREFIX: "@gmn/corrupted_backup_",
+  DIRTY_SETTINGS_PREFIX: "@gmn/dirty_settings_",
 } as const;
 

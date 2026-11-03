@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { AuthService } from "@/services/auth/AuthService";
 import { CloudSyncService } from "@/services/sync/CloudSyncService";
 import { SyncQueueService } from "@/services/sync/SyncQueueService";
+import { SettingsSyncManager } from "@/services/sync/SettingsSyncManager";
 import type { SyncStatus } from "@/types/sync";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, {
@@ -214,6 +215,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
             ]);
 
             applyCloudSync({
+              settings: migRes.mergedSettings,
               cloudHistory: sessions,
               cloudProfile: dbProf
                 ? {
@@ -252,8 +254,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         }
       })();
     } else if (!currentId && prevId) {
-      // User signed out
+      // User signed out: reset status and clean up guest dirty settings
       setSyncStatus("idle");
+      SettingsSyncManager.clearAllDirty("guest").catch(() => {});
     }
   }, [user?.id, ready, appState, applyCloudSync, refreshProfile]);
 
