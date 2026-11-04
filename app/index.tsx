@@ -3,6 +3,7 @@ import GameOverScreen from "@/screens/GameOverScreen";
 import GameScreen from "@/screens/GameScreen";
 import HomeScreen from "@/screens/HomeScreen";
 import HowToPlayScreen from "@/screens/HowToPlayScreen";
+import LeaderboardScreen from "@/screens/LeaderboardScreen";
 import PlayerGuessScreen from "@/screens/PlayerGuessScreen";
 import ProfileScreen from "@/screens/ProfileScreen";
 import ProgressionScreen from "@/screens/ProgressionScreen";
@@ -108,6 +109,7 @@ export default function Index() {
   }
 
   function handleGameOver(payload: {
+    sessionId?: string;
     won: boolean;
     rounds: number;
     elapsedMs: number;
@@ -115,9 +117,15 @@ export default function Index() {
     guesses: number[];
     secretNumber?: number;
     score?: number;
+    isRanked?: boolean;
+    isServerVerified?: boolean;
+    ratingDelta?: number;
+    newRating?: number;
+    newTier?: string;
   }) {
     if (!setup) return;
     const recorded = recordGame({
+      sessionId: payload.sessionId,
       won: payload.won,
       rounds: payload.rounds,
       userNumber: setup.userNumber ?? payload.secretNumber ?? 0,
@@ -132,6 +140,11 @@ export default function Index() {
       customConfig: setup.customConfig,
       player1Name: setup.player1Name,
       player2Name: setup.player2Name,
+      isRanked: payload.isRanked ?? setup.isRanked,
+      isServerVerified: payload.isServerVerified,
+      ratingDelta: payload.ratingDelta,
+      newRating: payload.newRating,
+      newTier: payload.newTier,
     });
     setResult(recorded);
     setScreen("gameOver");
@@ -157,6 +170,7 @@ export default function Index() {
         onHowTo={() => setScreen("howToPlay")}
         onProgression={() => setScreen("progression")}
         onProfile={() => setScreen("profile")}
+        onLeaderboard={() => setScreen("leaderboard")}
       />
     );
   } else if (screen === "setup") {
@@ -223,6 +237,8 @@ export default function Index() {
           difficultyId={setup.difficultyId}
           isDaily={setup.isDaily}
           dailyDateStr={setup.dailyDateStr}
+          isRanked={setup.isRanked}
+          serverSessionId={setup.serverSessionId}
           onGameOver={handleGameOver}
           onAbandon={goHome}
         />
@@ -283,6 +299,8 @@ export default function Index() {
     content = <SettingsScreen onBack={() => setScreen("home")} />;
   } else if (screen === "howToPlay") {
     content = <HowToPlayScreen onBack={() => setScreen("home")} />;
+  } else if (screen === "leaderboard") {
+    content = <LeaderboardScreen onBack={() => setScreen("home")} />;
   }
 
   return (

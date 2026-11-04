@@ -129,6 +129,47 @@ export default function GameOverScreen({ result, onReplay, onHome }: Props) {
             </Text>
           </View>
 
+          {/* Competitive Ranked Results Card (Group 07C) */}
+          {result.isRanked && (
+            <View style={styles.competitiveCard}>
+              <View style={styles.compHeaderRow}>
+                <View style={styles.compTitleWrap}>
+                  <Ionicons name="shield-checkmark" size={16} color={Colors.accent} />
+                  <Text style={styles.compCardTitle}>RANKED MATCH VERIFIED</Text>
+                </View>
+                <View style={styles.verifiedBadge}>
+                  <Text style={styles.verifiedBadgeText}>SERVER VERIFIED</Text>
+                </View>
+              </View>
+
+              <View style={styles.compStatsRow}>
+                <View style={styles.compCol}>
+                  <Text style={styles.compLabel}>COMPETITIVE RATING</Text>
+                  <Text style={styles.compValue}>
+                    {result.newRating != null ? `${result.newRating} CR` : "Ranked Result"}
+                  </Text>
+                </View>
+                {result.ratingDelta != null && (
+                  <View style={styles.compDeltaBadge}>
+                    <Ionicons
+                      name={result.ratingDelta >= 0 ? "trending-up" : "trending-down"}
+                      size={16}
+                      color={result.ratingDelta >= 0 ? "#10B981" : Colors.coral}
+                    />
+                    <Text
+                      style={[
+                        styles.compDeltaText,
+                        { color: result.ratingDelta >= 0 ? "#10B981" : Colors.coral },
+                      ]}
+                    >
+                      {result.ratingDelta >= 0 ? `+${result.ratingDelta}` : result.ratingDelta} CR
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+
           {/* Score Card */}
           <View style={styles.scoreCard}>
             <Text style={styles.scoreLabel}>TOTAL SCORE</Text>
@@ -622,5 +663,78 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.6,
+  },
+  competitiveCard: {
+    width: "100%",
+    backgroundColor: "rgba(16, 185, 129, 0.08)",
+    borderRadius: Radius.md,
+    padding: 14,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "rgba(16, 185, 129, 0.3)",
+    gap: 8,
+  },
+  compHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  compTitleWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  compCardTitle: {
+    fontFamily: FontFamily.mono,
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#10B981",
+    letterSpacing: 0.5,
+  },
+  verifiedBadge: {
+    backgroundColor: "rgba(16, 185, 129, 0.2)",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: Radius.sm,
+  },
+  verifiedBadgeText: {
+    fontFamily: FontFamily.mono,
+    fontSize: 9,
+    fontWeight: "700",
+    color: "#10B981",
+  },
+  compStatsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 2,
+  },
+  compCol: {
+    gap: 2,
+  },
+  compLabel: {
+    fontFamily: FontFamily.mono,
+    fontSize: 10,
+    color: Colors.textMuted,
+  },
+  compValue: {
+    fontFamily: FontFamily.mono,
+    fontSize: 18,
+    fontWeight: "700",
+    color: Colors.text,
+  },
+  compDeltaBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: Radius.sm,
+  },
+  compDeltaText: {
+    fontFamily: FontFamily.mono,
+    fontSize: 14,
+    fontWeight: "700",
   },
 });

@@ -15,12 +15,18 @@ export type CreateSessionParams = {
 };
 
 export type CompleteSessionParams = {
+  sessionId?: string;
   won: boolean;
   rounds: number;
   score: number;
   elapsedMs: number;
   secretNumber?: number;
   userNumber: number;
+  isRanked?: boolean;
+  isServerVerified?: boolean;
+  ratingDelta?: number;
+  newRating?: number;
+  newTier?: string;
 };
 
 export class GameSessionManager {
@@ -123,7 +129,7 @@ export class GameSessionManager {
     const elapsedMs = Math.max(params.elapsedMs, endedAt - session.startedAt);
 
     const result: GameResult = {
-      sessionId: session.sessionId,
+      sessionId: params.sessionId || session.sessionId,
       won: params.won,
       rounds: params.rounds,
       userNumber: params.userNumber,
@@ -135,6 +141,11 @@ export class GameSessionManager {
       hintsUsed: session.hintsUsed,
       isDaily: session.isDaily,
       guesses: session.guesses.map((g) => g.guess),
+      isRanked: params.isRanked,
+      isServerVerified: params.isServerVerified,
+      ratingDelta: params.ratingDelta,
+      newRating: params.newRating,
+      newTier: params.newTier,
     };
 
     const completedSession: GameSession = {

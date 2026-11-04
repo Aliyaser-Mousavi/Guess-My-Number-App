@@ -456,13 +456,19 @@ export class CloudSyncService {
       // Preserved for personal history, but NEVER processed for server XP
       let sessionsUploaded = 0;
       for (const record of guestSnapshot.history || []) {
-        const res = await this.uploadSession(
-          record,
-          userId,
-          "legacy_unverified",
-        );
-        if (res.success) {
-          sessionsUploaded += 1;
+        try {
+          const res = await this.uploadSession(
+            record,
+            userId,
+            "legacy_unverified",
+          );
+          if (res.success) {
+            sessionsUploaded += 1;
+          } else {
+            await SyncQueueService.enqueue("session", record, userId);
+          }
+        } catch {
+          await SyncQueueService.enqueue("session", record, userId);
         }
       }
 

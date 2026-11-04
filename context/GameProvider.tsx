@@ -460,12 +460,18 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       let finalResult: GameResult;
       if (activeSession) {
         const completion = GameSessionManager.completeSession(activeSession, {
+          sessionId: partial.sessionId,
           won: partial.won,
           rounds: partial.rounds,
           score,
           elapsedMs: partial.elapsedMs,
           secretNumber: partial.secretNumber,
           userNumber: partial.userNumber,
+          isRanked: partial.isRanked,
+          isServerVerified: partial.isServerVerified,
+          ratingDelta: partial.ratingDelta,
+          newRating: partial.newRating,
+          newTier: partial.newTier,
         });
 
         if (completion.isDuplicate) {
@@ -599,7 +605,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       });
 
       // Server-authoritative Cloud Sync & Offline Queue (SEC-01, SEC-03, SEC-06)
-      if (user?.id) {
+      // Skip client upload if session is already server-verified to prevent duplicate records
+      if (user?.id && !finalResult.isServerVerified) {
         CloudSyncService.uploadSession(historyRecord, user.id)
           .then((res) => {
             if (!res.success) {

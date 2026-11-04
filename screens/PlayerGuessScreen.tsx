@@ -20,13 +20,19 @@ import { Radius } from "@/constants/theme";
 import { useAppAlert } from "@/context/AlertProvider";
 import { useGame } from "@/context/GameProvider";
 import {
+  ServerAuthoritativeGameService,
+  type ServerSessionInfo,
+} from "@/services/serverGameplay/ServerAuthoritativeGameService";
+import {
   ProximityService,
   type ProximityFeedback,
 } from "@/services/proximity/ProximityService";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -41,13 +47,22 @@ type Props = {
   difficultyId: DifficultyId;
   isDaily: boolean;
   dailyDateStr?: string;
+  isRanked?: boolean;
+  serverSessionId?: string;
   onGameOver: (payload: {
+    sessionId?: string;
     won: boolean;
     rounds: number;
     elapsedMs: number;
     hintsUsed: number;
     guesses: number[];
     secretNumber: number;
+    score?: number;
+    isRanked?: boolean;
+    isServerVerified?: boolean;
+    ratingDelta?: number;
+    newRating?: number;
+    newTier?: string;
   }) => void;
   onAbandon?: () => void;
 };
@@ -56,6 +71,8 @@ export default function PlayerGuessScreen({
   difficultyId,
   isDaily,
   dailyDateStr,
+  isRanked = false,
+  serverSessionId,
   onGameOver,
   onAbandon,
 }: Props) {
@@ -94,6 +111,98 @@ export default function PlayerGuessScreen({
   const [lastProximity, setLastProximity] = useState<ProximityFeedback | null>(
     null,
   );
+
+  const [srvSessionId, setSrvSessionId] = useState<string | null>(serverSessionId || null);
+  const [isConnecting, setIsConnecting] = useState(() => Boolean(isRanked && !serverSessionId));
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+
+  const connectServerSession = useCallback(async (): Promise<{
+    success: boolean;
+    session?: ServerSessionInfo;
+    error?: string;
+  }> => {
+    try {
+      return await ServerAuthoritativeGameService.startSession({
+        difficulty: difficultyId,
+        mode: "player",
+        isRanked: true,
+      });
+    } catch (err: any) {
+      return {
+        success: false,
+        session: undefined,
+        error: err?.message || "Could not reach game server.",
+      };
+    }
+  }, [difficultyId]);
+
+  // Initialize server-authoritative session when isRanked is true
+  useEffect(() => {
+    if (isRanked && !srvSessionId) {
+      let isMounted = true;
+
+      connectServerSession().then((res) => {
+        if (!isMounted) return;
+        setIsConnecting(false);
+        if (res.success && res.session) {
+          setSrvSessionId(res.session.sessionId);
+          setLow(res.session.minRange);
+          setHigh(res.session.maxRange);
+          setLives(res.session.livesRemaining);
+          setHintsLeft(res.session.hintsRemaining);
+          setConnectionError(null);
+        } else {
+          setConnectionError(res.error || "Could not reach game server.");
+        }
+      });
+
+      return () => {
+        isMounted = false;
+      };
+    }
+  }, [isRanked, srvSessionId, connectServerSession]);
+
+  const retryServerSession = useCallback(async () => {
+    setIsConnecting(true);
+    setConnectionError(null);
+    const res = await connectServerSession();
+    setIsConnecting(false);
+    if (res.success && res.session) {
+      setSrvSessionId(res.session.sessionId);
+      setLow(res.session.minRange);
+      setHigh(res.session.maxRange);
+      setLives(res.session.livesRemaining);
+      setHintsLeft(res.session.hintsRemaining);
+      setConnectionError(null);
+    } else {
+      setConnectionError(res.error || "Could not reach game server.");
+    }
+  }, [connectServerSession]);
+
+  async function handleRequestServerHint() {
+    if (!srvSessionId || hintsLeft <= 0 || isPaused || isGameOver) return;
+    try {
+      const res = await ServerAuthoritativeGameService.requestHint(srvSessionId);
+      if (res.success && res.hint) {
+        buzz("success");
+        playSound("button_click");
+        const nextUsed = hintsUsed + 1;
+        setHintsUsed(nextUsed);
+        if (res.hintsRemaining != null) {
+          setHintsLeft(res.hintsRemaining);
+        } else {
+          setHintsLeft((h) => Math.max(0, h - 1));
+        }
+        showAlert("Server Oracle Clue", res.hint);
+      } else {
+        buzz("error");
+        showAlert("Hint Unavailable", res.error || "No hints available from server.");
+      }
+    } catch {
+      buzz("error");
+      showAlert("Network Error", "Could not retrieve hint from server.");
+    }
+  }
 
   function finish(won: boolean, nextHistory: GuessEntry[], usedHints: number) {
     if (ended.current) return;
@@ -161,6 +270,63 @@ export default function PlayerGuessScreen({
       return;
     }
 
+    // 1. Server-Authoritative Branch for Ranked Matches (STRICT: Never fall back to offline)
+    if (isRanked) {
+      if (!srvSessionId) {
+        buzz("error");
+        setConnectionError("Session disconnected. Reconnect to resume ranked match.");
+        return;
+      }
+
+      ServerAuthoritativeGameService.submitGuess(srvSessionId, value).then((res) => {
+        if (res.success && res.result) {
+          const srvRes = res.result;
+          recordSessionGuess(value, srvRes.feedback);
+          const entry: GuessEntry = { value, result: srvRes.feedback };
+          const nextHistory = [entry, ...history];
+          setHistory(nextHistory);
+          setGuess("");
+
+          if (srvRes.feedback === "low") setLow((l) => Math.max(l, value + 1));
+          if (srvRes.feedback === "high") setHigh((h) => Math.min(h, value - 1));
+          if (srvRes.livesRemaining != null) setLives(srvRes.livesRemaining);
+
+          if (srvRes.isGameOver) {
+            if (srvRes.won) {
+              playSound("guess_correct");
+              buzz("success");
+            } else {
+              buzz("error");
+            }
+            ended.current = true;
+            setIsGameOver(true);
+            onGameOver({
+              sessionId: srvSessionId,
+              won: srvRes.won,
+              rounds: srvRes.rounds,
+              elapsedMs: srvRes.elapsedMs || (Date.now() - startAt),
+              hintsUsed,
+              guesses: nextHistory.map((h) => h.value),
+              secretNumber: srvRes.secretNumber || 0,
+              score: srvRes.score,
+              isRanked: true,
+              isServerVerified: true,
+              ratingDelta: srvRes.competitive?.rating_delta,
+              newRating: srvRes.competitive?.new_rating,
+              newTier: srvRes.competitive?.new_tier,
+            });
+          } else {
+            buzz("medium");
+            playSound("guess_wrong");
+          }
+        } else {
+          showAlert("Server Error", res.error || "Failed to submit guess to game server.");
+        }
+      });
+      return;
+    }
+
+    // 2. Local Engine Branch (Casual / Offline / Daily)
     let result: GuessEntry["result"] = "correct";
     if (value < secret) result = "low";
     else if (value > secret) result = "high";
@@ -302,20 +468,20 @@ export default function PlayerGuessScreen({
               maxLength={String(difficulty.max).length}
               value={guess}
               onChangeText={setGuess}
-              placeholder="Enter number"
+              placeholder={isConnecting ? "Connecting..." : "Enter number"}
               placeholderTextColor={Colors.textDim}
               selectionColor={Colors.accent}
-              editable={!isPaused && !isGameOver}
+              editable={!isPaused && !isGameOver && !isConnecting}
             />
             <View style={styles.actionsRow}>
               <View style={{ flex: 1.6 }}>
                 <PrimaryButton
                   variant="accent"
                   onPress={submitGuess}
-                  disabled={isPaused || isGameOver}
+                  disabled={isPaused || isGameOver || isConnecting}
                   icon={<Ionicons name="send" size={17} color={Colors.bg} />}
                 >
-                  Submit Guess
+                  {isConnecting ? "Connecting..." : "Submit Guess"}
                 </PrimaryButton>
               </View>
               {hintsLeft > 0 && (
@@ -325,9 +491,13 @@ export default function PlayerGuessScreen({
                     onPress={() => {
                       buzz("light");
                       playSound("button_click");
-                      setHintModalVisible(true);
+                      if (isRanked && srvSessionId) {
+                        handleRequestServerHint();
+                      } else {
+                        setHintModalVisible(true);
+                      }
                     }}
-                    disabled={isPaused || isGameOver}
+                    disabled={isPaused || isGameOver || isConnecting}
                     icon={
                       <Ionicons
                         name="bulb-outline"
@@ -387,9 +557,54 @@ export default function PlayerGuessScreen({
           onAbandon={() => {
             setIsPaused(false);
             abandonSession();
+            if (isRanked && srvSessionId) {
+              ServerAuthoritativeGameService.abandonSession(srvSessionId).catch(() => {});
+            }
             if (onAbandon) onAbandon();
           }}
         />
+
+        {/* Ranked Connection Error Modal (Strict Anti-Offline Guard) */}
+        <Modal
+          visible={Boolean(isRanked && connectionError)}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            if (onAbandon) onAbandon();
+          }}
+        >
+          <View style={styles.errorModalOverlay}>
+            <Card variant="elevated" style={styles.errorModalCard}>
+              <View style={styles.errorIconWrap}>
+                <Ionicons name="cloud-offline" size={32} color={Colors.coral} />
+              </View>
+              <Title size="sm" style={{ textAlign: "center", marginBottom: 8 }}>
+                Ranked Server Offline
+              </Title>
+              <Text style={styles.errorModalText}>
+                {connectionError || "Could not establish a verified game session with the competitive server."}
+              </Text>
+              <View style={{ gap: 10, width: "100%", marginTop: 16 }}>
+                <PrimaryButton
+                  variant="accent"
+                  onPress={retryServerSession}
+                  icon={<Ionicons name="refresh" size={16} color={Colors.bg} />}
+                >
+                  Retry Connection
+                </PrimaryButton>
+                <PrimaryButton
+                  variant="ghost"
+                  onPress={() => {
+                    if (onAbandon) onAbandon();
+                  }}
+                  icon={<Ionicons name="arrow-back" size={16} color={Colors.text} />}
+                >
+                  Return to Menu
+                </PrimaryButton>
+              </View>
+            </Card>
+          </View>
+        </Modal>
       </SafeAreaView>
     </ScreenBackground>
   );
@@ -468,5 +683,34 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     color: Colors.textDim,
     marginBottom: 8,
+  },
+  errorModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.75)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  errorModalCard: {
+    width: "100%",
+    maxWidth: 380,
+    padding: 20,
+    alignItems: "center",
+  },
+  errorIconWrap: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "rgba(239, 68, 68, 0.15)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  errorModalText: {
+    fontFamily: "SpaceGrotesk-Regular",
+    fontSize: 13,
+    color: Colors.textMuted,
+    textAlign: "center",
+    lineHeight: 19,
   },
 });

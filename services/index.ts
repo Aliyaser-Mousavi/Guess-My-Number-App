@@ -20,4 +20,8 @@ export * from "./auth/AuthService";
 export * from "./sync/SyncQueueService";
 export * from "./sync/SettingsSyncManager";
 export * from "./sync/CloudSyncService";
+export * from "./serverGameplay/ServerAuthoritativeGameService";
+export * from "./competitive/CompetitiveRatingService";
+export * from "./leaderboard/LeaderboardService";
+export * from "./matchmaking/MatchmakingService";
 export * from "@/lib/supabase";

@@ -36,6 +36,7 @@ type Props = {
   onHowTo: () => void;
   onProgression: () => void;
   onProfile: () => void;
+  onLeaderboard?: () => void;
   dailyDone: boolean;
 };
 
@@ -48,6 +49,7 @@ export default function HomeScreen({
   onHowTo,
   onProgression,
   onProfile,
+  onLeaderboard,
   dailyDone,
 }: Props) {
   const {
@@ -447,6 +449,47 @@ export default function HomeScreen({
                 color={Colors.textDim}
               />
             </Pressable>
+
+            {/* Global Ranked Leaderboard */}
+            {onLeaderboard && (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.navCard,
+                  isRTL && styles.rowReverse,
+                  pressed && styles.navCardPressed,
+                ]}
+                onPress={() => {
+                  buzz("light");
+                  playSound("button_click");
+                  onLeaderboard();
+                }}
+              >
+                <View
+                  style={[
+                    styles.navIconContainer,
+                    { backgroundColor: "rgba(255, 184, 0, 0.14)" },
+                  ]}
+                >
+                  <Ionicons name="podium" size={20} color={Colors.accent} />
+                </View>
+                <View
+                  style={[
+                    styles.navTextContainer,
+                    isRTL && { alignItems: "flex-end" },
+                  ]}
+                >
+                  <Text style={styles.navLabel}>Leaderboard</Text>
+                  <Text style={styles.navMeta}>
+                    Global Ranked Standings • {competitiveRank.label}
+                  </Text>
+                </View>
+                <Ionicons
+                  name={LocalizationService.getChevronForward(settings.language)}
+                  size={16}
+                  color={Colors.textDim}
+                />
+              </Pressable>
+            )}
 
             {/* Full Stats */}
             <Pressable

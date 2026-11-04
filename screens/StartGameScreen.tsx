@@ -12,6 +12,7 @@ import {
 } from "@/constants/gameConfig";
 import { FontFamily, Radius } from "@/constants/theme";
 import { useAppAlert } from "@/context/AlertProvider";
+import { useAuth } from "@/context/AuthProvider";
 import { useGame } from "@/context/GameProvider";
 import type { CustomGameConfig, SetupConfig } from "@/types/game";
 import { Ionicons } from "@expo/vector-icons";
@@ -43,11 +44,13 @@ export default function StartGameScreen({
 }: Props) {
   const { buzz, playSound, recommendation } = useGame();
   const { showAlert } = useAppAlert();
+  const { user, isGuest } = useAuth();
 
   const [mode, setMode] = useState<GameMode>("opponent");
   const [difficultyId, setDifficultyId] = useState<DifficultyId>("medium");
   const [enteredNumber, setEnteredNumber] = useState("");
   const [dismissedRecommendation, setDismissedRecommendation] = useState(false);
+  const [isRanked, setIsRanked] = useState(false);
 
   // Time Attack duration option: 30s, 60s, 90s
   const [timeLimit, setTimeLimit] = useState(60);
@@ -100,6 +103,7 @@ export default function StartGameScreen({
         mode: "player",
         difficultyId,
         isDaily: forcedDaily,
+        isRanked: forcedDaily ? false : isRanked,
       });
       return;
     }
@@ -440,6 +444,73 @@ export default function StartGameScreen({
                       })}
                     </View>
                   </>
+                )}
+
+                {/* 1B. Ranked Mode Toggle (Group 07C) */}
+                {mode === "player" && !forcedDaily && (
+                  <Pressable
+                    onPress={() => {
+                      if (isGuest) {
+                        showAlert(
+                          "Authentication Required",
+                          "Ranked matches require signing in with an account so your Competitive Rating (CR / MMR) is verified on the server.",
+                        );
+                        return;
+                      }
+                      buzz("medium");
+                      playSound("button_click");
+                      setIsRanked((r) => !r);
+                    }}
+                    style={[
+                      styles.rankedToggleCard,
+                      isRanked && styles.rankedToggleCardActive,
+                    ]}
+                  >
+                    <View style={styles.rankedToggleLeft}>
+                      <View
+                        style={[
+                          styles.rankedIconWrap,
+                          isRanked && { backgroundColor: "rgba(245, 158, 11, 0.2)" },
+                        ]}
+                      >
+                        <Ionicons
+                          name={isRanked ? "shield-checkmark" : "shield-outline"}
+                          size={22}
+                          color={isRanked ? Colors.accent : Colors.textMuted}
+                        />
+                      </View>
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <View style={styles.rankedBadgeRow}>
+                          <Text style={[styles.rankedTitle, isRanked && { color: Colors.accent }]}>
+                            COMPETITIVE RANKED
+                          </Text>
+                          {isRanked && (
+                            <View style={styles.rankedPill}>
+                              <Text style={styles.rankedPillText}>SERVER VERIFIED</Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={styles.rankedDesc}>
+                          {isRanked
+                            ? "Server-authoritative game. Secret generated on server. Results update your official Competitive Rating (CR)."
+                            : "Casual match. Tap to enable Ranked mode with server verification & MMR."}
+                        </Text>
+                      </View>
+                    </View>
+                    <View
+                      style={[
+                        styles.toggleSwitch,
+                        isRanked && styles.toggleSwitchActive,
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.toggleKnob,
+                          isRanked && styles.toggleKnobActive,
+                        ]}
+                      />
+                    </View>
+                  </Pressable>
                 )}
 
                 {/* 2. Oracle Mode Number Input */}
@@ -1008,5 +1079,85 @@ const styles = StyleSheet.create({
     fontSize: 14,
     borderWidth: 1,
     borderColor: Colors.border,
+  },
+  rankedToggleCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    borderRadius: Radius.md,
+    padding: 14,
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
+    gap: 12,
+  },
+  rankedToggleCardActive: {
+    borderColor: Colors.accent,
+    backgroundColor: "rgba(245, 158, 11, 0.08)",
+  },
+  rankedToggleLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  rankedIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rankedBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  rankedTitle: {
+    fontFamily: FontFamily.mono,
+    fontSize: 12,
+    fontWeight: "700",
+    color: Colors.text,
+    letterSpacing: 0.5,
+  },
+  rankedPill: {
+    backgroundColor: "rgba(245, 158, 11, 0.2)",
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: Radius.sm,
+  },
+  rankedPillText: {
+    fontFamily: FontFamily.mono,
+    fontSize: 8,
+    fontWeight: "700",
+    color: Colors.accent,
+  },
+  rankedDesc: {
+    fontFamily: FontFamily.sans,
+    fontSize: 11,
+    color: Colors.textMuted,
+    lineHeight: 15,
+  },
+  toggleSwitch: {
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    padding: 2,
+    justifyContent: "center",
+  },
+  toggleSwitchActive: {
+    backgroundColor: Colors.accent,
+  },
+  toggleKnob: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#FFF",
+  },
+  toggleKnobActive: {
+    transform: [{ translateX: 20 }],
   },
 });

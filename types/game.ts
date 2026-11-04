@@ -11,7 +11,8 @@ export type AppScreen =
   | "progression"
   | "profile"
   | "settings"
-  | "howToPlay";
+  | "howToPlay"
+  | "leaderboard";
 
 // ==========================================
 // 1. Core Gameplay Results
@@ -35,6 +36,8 @@ export type SetupConfig = {
   customConfig?: CustomGameConfig;
   player1Name?: string;
   player2Name?: string;
+  isRanked?: boolean;
+  serverSessionId?: string;
 };
 
 export type GameResult = {
@@ -50,6 +53,11 @@ export type GameResult = {
   isDaily: boolean;
   guesses: number[];
   sessionId?: string;
+  isRanked?: boolean;
+  isServerVerified?: boolean;
+  ratingDelta?: number;
+  newRating?: number;
+  newTier?: string;
 };
 
 export type BestScores = Partial<Record<`${GameMode}-${DifficultyId}`, number>>;

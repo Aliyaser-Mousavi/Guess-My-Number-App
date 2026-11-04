@@ -253,12 +253,15 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
           isSyncingRef.current = false;
         }
       })();
+    } else if (currentId && prevId && currentId !== prevId) {
+      // Direct account switch: trigger fresh sync for the new user account
+      performSync().catch(() => {});
     } else if (!currentId && prevId) {
       // User signed out: reset status and clean up guest dirty settings
       setSyncStatus("idle");
       SettingsSyncManager.clearAllDirty("guest").catch(() => {});
     }
-  }, [user?.id, ready, appState, applyCloudSync, refreshProfile]);
+  }, [user?.id, ready, appState, applyCloudSync, refreshProfile, performSync]);
 
   /**
    * Trigger automatic synchronization when app returns to foreground.
