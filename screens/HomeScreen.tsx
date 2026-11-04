@@ -37,6 +37,9 @@ type Props = {
   onProgression: () => void;
   onProfile: () => void;
   onLeaderboard?: () => void;
+  onMultiplayer?: () => void;
+  onTournaments?: () => void;
+  onSeasons?: () => void;
   dailyDone: boolean;
 };
 
@@ -50,6 +53,9 @@ export default function HomeScreen({
   onProgression,
   onProfile,
   onLeaderboard,
+  onMultiplayer,
+  onTournaments,
+  onSeasons,
   dailyDone,
 }: Props) {
   const {
@@ -481,6 +487,129 @@ export default function HomeScreen({
                   <Text style={styles.navLabel}>Leaderboard</Text>
                   <Text style={styles.navMeta}>
                     Global Ranked Standings • {competitiveRank.label}
+                  </Text>
+                </View>
+                <Ionicons
+                  name={LocalizationService.getChevronForward(settings.language)}
+                  size={16}
+                  color={Colors.textDim}
+                />
+              </Pressable>
+            )}
+
+            {/* 1v1 Online Battle (Multiplayer) */}
+            {onMultiplayer && (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.navCard,
+                  isRTL && styles.rowReverse,
+                  pressed && styles.navCardPressed,
+                ]}
+                onPress={() => {
+                  buzz("light");
+                  playSound("button_click");
+                  onMultiplayer();
+                }}
+              >
+                <View
+                  style={[
+                    styles.navIconContainer,
+                    { backgroundColor: "rgba(0, 210, 180, 0.15)" },
+                  ]}
+                >
+                  <Ionicons name="flash" size={20} color={Colors.primary} />
+                </View>
+                <View
+                  style={[
+                    styles.navTextContainer,
+                    isRTL && { alignItems: "flex-end" },
+                  ]}
+                >
+                  <Text style={styles.navLabel}>1v1 Online Battle</Text>
+                  <Text style={styles.navMeta}>
+                    Real-time Skill-Based Matchmaking & Rooms
+                  </Text>
+                </View>
+                <Ionicons
+                  name={LocalizationService.getChevronForward(settings.language)}
+                  size={16}
+                  color={Colors.textDim}
+                />
+              </Pressable>
+            )}
+
+            {/* Weekly Tournaments */}
+            {onTournaments && (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.navCard,
+                  isRTL && styles.rowReverse,
+                  pressed && styles.navCardPressed,
+                ]}
+                onPress={() => {
+                  buzz("light");
+                  playSound("button_click");
+                  onTournaments();
+                }}
+              >
+                <View
+                  style={[
+                    styles.navIconContainer,
+                    { backgroundColor: "rgba(255, 92, 114, 0.14)" },
+                  ]}
+                >
+                  <Ionicons name="trophy" size={20} color={Colors.coral} />
+                </View>
+                <View
+                  style={[
+                    styles.navTextContainer,
+                    isRTL && { alignItems: "flex-end" },
+                  ]}
+                >
+                  <Text style={styles.navLabel}>Tournaments</Text>
+                  <Text style={styles.navMeta}>
+                    Weekly Oracle Championship • Limited Tries
+                  </Text>
+                </View>
+                <Ionicons
+                  name={LocalizationService.getChevronForward(settings.language)}
+                  size={16}
+                  color={Colors.textDim}
+                />
+              </Pressable>
+            )}
+
+            {/* Competitive Seasons */}
+            {onSeasons && (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.navCard,
+                  isRTL && styles.rowReverse,
+                  pressed && styles.navCardPressed,
+                ]}
+                onPress={() => {
+                  buzz("light");
+                  playSound("button_click");
+                  onSeasons();
+                }}
+              >
+                <View
+                  style={[
+                    styles.navIconContainer,
+                    { backgroundColor: "rgba(168, 85, 247, 0.15)" },
+                  ]}
+                >
+                  <Ionicons name="planet" size={20} color="#A855F7" />
+                </View>
+                <View
+                  style={[
+                    styles.navTextContainer,
+                    isRTL && { alignItems: "flex-end" },
+                  ]}
+                >
+                  <Text style={styles.navLabel}>Season 1 Hub</Text>
+                  <Text style={styles.navMeta}>
+                    Tier Rewards, Soft-Reset & Event Protocols
                   </Text>
                 </View>
                 <Ionicons

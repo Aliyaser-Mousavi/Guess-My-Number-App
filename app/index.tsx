@@ -4,6 +4,14 @@ import GameScreen from "@/screens/GameScreen";
 import HomeScreen from "@/screens/HomeScreen";
 import HowToPlayScreen from "@/screens/HowToPlayScreen";
 import LeaderboardScreen from "@/screens/LeaderboardScreen";
+import MultiplayerLobbyScreen, {
+  type MultiplayerGameStartParams,
+} from "@/screens/multiplayer/MultiplayerLobbyScreen";
+import MultiplayerGameScreen from "@/screens/multiplayer/MultiplayerGameScreen";
+import TournamentsScreen from "@/screens/tournaments/TournamentsScreen";
+import SeasonsScreen from "@/screens/seasons/SeasonsScreen";
+import { TournamentService, type TournamentInfo } from "@/services/tournament/TournamentService";
+import type { SeasonalEventInfo } from "@/services/seasons/SeasonsService";
 import PlayerGuessScreen from "@/screens/PlayerGuessScreen";
 import ProfileScreen from "@/screens/ProfileScreen";
 import ProgressionScreen from "@/screens/ProgressionScreen";
@@ -60,6 +68,7 @@ export default function Index() {
   const [setup, setSetup] = useState<SetupConfig | null>(null);
   const [result, setResult] = useState<GameResult | null>(null);
   const [dailyForced, setDailyForced] = useState(false);
+  const [multiplayerParams, setMultiplayerParams] = useState<MultiplayerGameStartParams | null>(null);
 
   const [fontsLoaded] = useFonts({
     "SpaceGrotesk-Regular": SpaceGrotesk_400Regular,
@@ -95,6 +104,7 @@ export default function Index() {
     setSetup(null);
     setResult(null);
     setDailyForced(false);
+    setMultiplayerParams(null);
   }
 
   function handleStart(config: SetupConfig) {
@@ -148,6 +158,16 @@ export default function Index() {
     });
     setResult(recorded);
     setScreen("gameOver");
+
+    // Secure server-verified tournament attempt recording
+    if (setup.tournamentId && payload.sessionId && payload.won) {
+      TournamentService.recordAttempt({
+        tournamentId: setup.tournamentId,
+        sessionId: payload.sessionId,
+      }).catch((err) => {
+        console.warn("[app] Failed to record tournament attempt:", err.message);
+      });
+    }
   }
 
   let content: React.ReactNode = null;
@@ -171,6 +191,9 @@ export default function Index() {
         onProgression={() => setScreen("progression")}
         onProfile={() => setScreen("profile")}
         onLeaderboard={() => setScreen("leaderboard")}
+        onMultiplayer={() => setScreen("multiplayerLobby")}
+        onTournaments={() => setScreen("tournaments")}
+        onSeasons={() => setScreen("seasons")}
       />
     );
   } else if (screen === "setup") {
@@ -301,6 +324,57 @@ export default function Index() {
     content = <HowToPlayScreen onBack={() => setScreen("home")} />;
   } else if (screen === "leaderboard") {
     content = <LeaderboardScreen onBack={() => setScreen("home")} />;
+  } else if (screen === "multiplayerLobby") {
+    content = (
+      <MultiplayerLobbyScreen
+        onBack={goHome}
+        onStartMatch={(params) => {
+          setMultiplayerParams(params);
+          setScreen("multiplayerGame");
+        }}
+      />
+    );
+  } else if (screen === "multiplayerGame" && multiplayerParams) {
+    content = (
+      <MultiplayerGameScreen
+        matchId={multiplayerParams.matchId}
+        opponent={multiplayerParams.opponent}
+        minRange={multiplayerParams.minRange}
+        maxRange={multiplayerParams.maxRange}
+        livesRemaining={multiplayerParams.livesRemaining}
+        difficulty={multiplayerParams.difficulty}
+        onExit={goHome}
+      />
+    );
+  } else if (screen === "tournaments") {
+    content = (
+      <TournamentsScreen
+        onBack={() => setScreen("home")}
+        onStartAttempt={(tourn) => {
+          handleStart({
+            mode: "player",
+            difficultyId: tourn.difficulty as any,
+            isDaily: false,
+            isRanked: true,
+            tournamentId: tourn.tournamentId,
+          });
+        }}
+      />
+    );
+  } else if (screen === "seasons") {
+    content = (
+      <SeasonsScreen
+        onBack={() => setScreen("home")}
+        onPlayEvent={(evt) => {
+          handleStart({
+            mode: "player",
+            difficultyId: "medium",
+            isDaily: false,
+            timeLimitSeconds: evt.rules.timeLimit,
+          });
+        }}
+      />
+    );
   }
 
   return (

@@ -2,8 +2,8 @@
 /* eslint-disable */
 // ==============================================================================
 // Supabase Edge Function: /game-session
-// Description: Server-Authoritative Gameplay Engine, Move Validation,
-//              Secret Number Concealment, and Reward & Rating Pipeline Integration.
+// Description: Server-Authoritative Gameplay Engine supporting Single-Player Ranked
+//              AND Real-Time 1v1 Online Multiplayer (Resolving CRIT-02).
 // ==============================================================================
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
@@ -19,32 +19,6 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-interface StartPayload {
-  action: "start";
-  mode?: string;
-  difficulty?: "easy" | "medium" | "hard" | "expert";
-  isRanked?: boolean;
-  isDaily?: boolean;
-}
-
-interface GuessPayload {
-  action: "guess";
-  sessionId: string;
-  guess: number;
-}
-
-interface HintPayload {
-  action: "hint";
-  sessionId: string;
-}
-
-interface AbandonPayload {
-  action: "abandon";
-  sessionId: string;
-}
-
-type RequestPayload = StartPayload | GuessPayload | HintPayload | AbandonPayload;
 
 const DIFFICULTY_CONFIG = {
   easy: { min: 1, max: 50, lives: 8, hints: 3, multiplier: 1.0 },
@@ -77,7 +51,6 @@ serve(async (req: Request) => {
       );
     }
 
-    // 1. Authenticate user from Bearer Token
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(
@@ -97,14 +70,361 @@ serve(async (req: Request) => {
       );
     }
 
-    // 2. Initialize Authoritative Service Role Client
     const admin = createClient(supabaseUrl, supabaseServiceKey);
+    const payload = await req.json();
 
-    const payload: RequestPayload = await req.json();
+    // =========================================================================
+    // BRANCH A: REAL-TIME 1v1 MULTIPLAYER MATCHES (Resolves CRIT-02)
+    // =========================================================================
+    const matchId = payload.matchId || payload.sessionId;
 
-    // -------------------------------------------------------------------------
-    // ACTION: START SESSION
-    // -------------------------------------------------------------------------
+    // Check if target is a 1v1 multiplayer match
+    const { data: mpMatch } = await admin
+      .from("multiplayer_matches")
+      .select("*")
+      .eq("id", matchId)
+      .maybeSingle();
+
+    if (mpMatch) {
+      // Authorize BOTH Player A and Player B (CRIT-02 resolution)
+      const isPlayerA = mpMatch.player_a_id === user.id;
+      const isPlayerB = mpMatch.player_b_id === user.id;
+
+      if (!isPlayerA && !isPlayerB) {
+        return new Response(
+          JSON.stringify({ error: "Unauthorized: You are not a participant in this 1v1 match." }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const opponentId = isPlayerA ? mpMatch.player_b_id : mpMatch.player_a_id;
+
+      // 1. ACTION: MULTIPLAYER GUESS
+      if (payload.action === "guess") {
+        if (mpMatch.status !== "in_progress") {
+          return new Response(
+            JSON.stringify({
+              error: `Match is not active (status: ${mpMatch.status}).`,
+              isGameOver: true,
+              winnerId: mpMatch.winner_id,
+            }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+
+        const guess = Number(payload.guess);
+        if (isNaN(guess) || guess < mpMatch.min_range || guess > mpMatch.max_range) {
+          return new Response(
+            JSON.stringify({ error: `Guess out of range [${mpMatch.min_range}, ${mpMatch.max_range}].` }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+
+        // Fetch participant rows
+        const { data: myPart } = await admin
+          .from("multiplayer_participants")
+          .select("*")
+          .eq("match_id", mpMatch.id)
+          .eq("user_id", user.id)
+          .single();
+
+        const { data: oppPart } = await admin
+          .from("multiplayer_participants")
+          .select("*")
+          .eq("match_id", mpMatch.id)
+          .eq("user_id", opponentId)
+          .maybeSingle();
+
+        const nextRounds = (myPart?.rounds || 0) + 1;
+        const nextGuesses = [...(myPart?.guesses || []), guess];
+        const secret = mpMatch.secret_number;
+        const elapsedMs = Math.max(1000, Date.now() - new Date(mpMatch.started_at || mpMatch.created_at).getTime());
+
+        if (guess === secret) {
+          // --- PLAYER SOLVED FIRST (VICTORY) ---
+          await admin
+            .from("multiplayer_participants")
+            .update({
+              solved: true,
+              solved_at: new Date().toISOString(),
+              rounds: nextRounds,
+              guesses: nextGuesses,
+              feedbacks: [...(myPart?.feedbacks || []), "correct"],
+              score: 1500,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", myPart.id);
+
+          await admin
+            .from("multiplayer_matches")
+            .update({
+              status: "completed",
+              winner_id: user.id,
+              completed_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", mpMatch.id);
+
+          // Update competitive ratings if ranked 1v1
+          let compResult: any = null;
+          if (mpMatch.match_type === "ranked_1v1") {
+            // Winner rating update
+            await admin.from("game_sessions").insert({
+              id: mpMatch.id,
+              user_id: user.id,
+              client_session_id: `mp_${mpMatch.id}_${user.id}`,
+              mode: "player",
+              difficulty: mpMatch.difficulty,
+              won: true,
+              rounds: nextRounds,
+              score: 1500,
+              elapsed_ms: elapsedMs,
+              hints_used: myPart?.hints_used || 0,
+              is_daily: false,
+              user_number: secret,
+              secret_number: secret,
+              guesses: nextGuesses,
+              verification_status: "server_verified",
+              processed_for_rewards: false,
+              xp_awarded: 0,
+            });
+
+            const { data: cData } = await admin.rpc("update_player_competitive_rating", {
+              p_user_id: user.id,
+              p_session_id: mpMatch.id,
+              p_won: true,
+              p_rounds: nextRounds,
+              p_difficulty: mpMatch.difficulty,
+              p_elapsed_ms: elapsedMs,
+            });
+            compResult = cData;
+
+            // Live update player_season_stats and user_event_progress
+            try {
+              await admin.rpc("process_match_season_and_events", {
+                p_user_id: user.id,
+                p_session_id: mpMatch.id,
+                p_won: true,
+                p_rounds: nextRounds,
+                p_elapsed_ms: elapsedMs,
+                p_mode: "ranked_1v1",
+                p_is_ranked: true,
+              });
+            } catch (err: any) {
+              console.warn("[game-session] Error processing season/event progress:", err.message);
+            }
+
+            // Opponent rating deduction
+            if (opponentId) {
+              const oppSessionId = crypto.randomUUID();
+              await admin.from("game_sessions").insert({
+                id: oppSessionId,
+                user_id: opponentId,
+                client_session_id: `mp_${mpMatch.id}_${opponentId}`,
+                mode: "player",
+                difficulty: mpMatch.difficulty,
+                won: false,
+                rounds: oppPart?.rounds || 1,
+                score: 0,
+                elapsed_ms: elapsedMs,
+                hints_used: oppPart?.hints_used || 0,
+                is_daily: false,
+                user_number: secret,
+                secret_number: secret,
+                guesses: oppPart?.guesses || [],
+                verification_status: "server_verified",
+                processed_for_rewards: false,
+                xp_awarded: 0,
+              });
+
+              await admin.rpc("update_player_competitive_rating", {
+                p_user_id: opponentId,
+                p_session_id: oppSessionId,
+                p_won: false,
+                p_rounds: oppPart?.rounds || 1,
+                p_difficulty: mpMatch.difficulty,
+                p_elapsed_ms: elapsedMs,
+              });
+
+              try {
+                await admin.rpc("process_match_season_and_events", {
+                  p_user_id: opponentId,
+                  p_session_id: oppSessionId,
+                  p_won: false,
+                  p_rounds: oppPart?.rounds || 1,
+                  p_elapsed_ms: elapsedMs,
+                  p_mode: "ranked_1v1",
+                  p_is_ranked: true,
+                });
+              } catch (err: any) {
+                console.warn("[game-session] Error processing opponent season/event progress:", err.message);
+              }
+            }
+          }
+
+          return new Response(
+            JSON.stringify({
+              success: true,
+              feedback: "correct",
+              won: true,
+              isGameOver: true,
+              winnerId: user.id,
+              secretNumber: secret,
+              rounds: nextRounds,
+              competitive: compResult,
+              opponentProgress: {
+                rounds: oppPart?.rounds || 0,
+                livesRemaining: oppPart?.lives_remaining || 7,
+                lowBound: oppPart?.low_bound || mpMatch.min_range,
+                highBound: oppPart?.high_bound || mpMatch.max_range,
+                solved: false,
+              },
+            }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+
+        // --- WRONG GUESS ---
+        const nextLives = Math.max(0, (myPart?.lives_remaining || 7) - 1);
+        const feedback = guess < secret ? "low" : "high";
+        const nextLow = feedback === "low" ? Math.max(myPart?.low_bound || mpMatch.min_range, guess + 1) : (myPart?.low_bound || mpMatch.min_range);
+        const nextHigh = feedback === "high" ? Math.min(myPart?.high_bound || mpMatch.max_range, guess - 1) : (myPart?.high_bound || mpMatch.max_range);
+
+        await admin
+          .from("multiplayer_participants")
+          .update({
+            rounds: nextRounds,
+            guesses: nextGuesses,
+            feedbacks: [...(myPart?.feedbacks || []), feedback],
+            lives_remaining: nextLives,
+            low_bound: nextLow,
+            high_bound: nextHigh,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", myPart.id);
+
+        const isEliminated = nextLives === 0;
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            feedback,
+            won: false,
+            isGameOver: isEliminated,
+            livesRemaining: nextLives,
+            rounds: nextRounds,
+            lowBound: nextLow,
+            highBound: nextHigh,
+            opponentProgress: {
+              rounds: oppPart?.rounds || 0,
+              livesRemaining: oppPart?.lives_remaining || 7,
+              lowBound: oppPart?.low_bound || mpMatch.min_range,
+              highBound: oppPart?.high_bound || mpMatch.max_range,
+              solved: oppPart?.solved || false,
+            },
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      // 2. ACTION: MULTIPLAYER SYNC / STATUS POLL
+      if (payload.action === "sync" || payload.action === "status") {
+        const { data: myPart } = await admin
+          .from("multiplayer_participants")
+          .select("*")
+          .eq("match_id", mpMatch.id)
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        const { data: oppPart } = await admin
+          .from("multiplayer_participants")
+          .select("*")
+          .eq("match_id", mpMatch.id)
+          .eq("user_id", opponentId)
+          .maybeSingle();
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            status: mpMatch.status,
+            winnerId: mpMatch.winner_id,
+            isGameOver: mpMatch.status === "completed" || mpMatch.status === "abandoned",
+            secretNumber: mpMatch.status === "completed" ? mpMatch.secret_number : undefined,
+            myProgress: {
+              rounds: myPart?.rounds || 0,
+              livesRemaining: myPart?.lives_remaining || 7,
+              solved: myPart?.solved || false,
+            },
+            opponentProgress: {
+              rounds: oppPart?.rounds || 0,
+              livesRemaining: oppPart?.lives_remaining || 7,
+              lowBound: oppPart?.low_bound || mpMatch.min_range,
+              highBound: oppPart?.high_bound || mpMatch.max_range,
+              solved: oppPart?.solved || false,
+            },
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      // 3. ACTION: MULTIPLAYER FORFEIT / ABANDON
+      if (payload.action === "abandon") {
+        await admin
+          .from("multiplayer_matches")
+          .update({
+            status: "abandoned",
+            forfeit_by: user.id,
+            winner_id: opponentId,
+            completed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", mpMatch.id);
+
+        if (mpMatch.match_type === "ranked_1v1") {
+          // Forfeit penalty for caller
+          const forfSessionId = crypto.randomUUID();
+          await admin.from("game_sessions").insert({
+            id: forfSessionId,
+            user_id: user.id,
+            client_session_id: `mp_forfeit_${mpMatch.id}_${user.id}`,
+            mode: "player",
+            difficulty: mpMatch.difficulty,
+            won: false,
+            rounds: 1,
+            score: 0,
+            elapsed_ms: 1000,
+            hints_used: 0,
+            is_daily: false,
+            user_number: mpMatch.secret_number,
+            secret_number: mpMatch.secret_number,
+            guesses: [],
+            verification_status: "server_verified",
+            processed_for_rewards: false,
+            xp_awarded: 0,
+          });
+
+          await admin.rpc("update_player_competitive_rating", {
+            p_user_id: user.id,
+            p_session_id: forfSessionId,
+            p_won: false,
+            p_rounds: 1,
+            p_difficulty: mpMatch.difficulty,
+            p_elapsed_ms: 1000,
+          });
+        }
+
+        return new Response(
+          JSON.stringify({ success: true, status: "abandoned", winnerId: opponentId }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
+
+    // =========================================================================
+    // BRANCH B: SINGLE-PLAYER SERVER-AUTHORITATIVE SESSIONS (PRESERVED 07C)
+    // =========================================================================
+
+    // ACTION: START SINGLE-PLAYER SESSION
     if (payload.action === "start") {
       const mode = payload.mode || "player";
       const diff = payload.difficulty && DIFFICULTY_CONFIG[payload.difficulty]
@@ -113,8 +433,6 @@ serve(async (req: Request) => {
       const config = DIFFICULTY_CONFIG[diff];
       const isRanked = Boolean(payload.isRanked);
       const isDaily = Boolean(payload.isDaily);
-
-      // Securely generate secret number on server
       const secretNumber = generateSecureSecret(config.min, config.max);
 
       const { data: newSession, error: createErr } = await admin
@@ -148,7 +466,6 @@ serve(async (req: Request) => {
         );
       }
 
-      // Return session parameters to client WITHOUT exposing secret_number!
       return new Response(
         JSON.stringify({
           success: true,
@@ -169,9 +486,7 @@ serve(async (req: Request) => {
       );
     }
 
-    // -------------------------------------------------------------------------
-    // ACTION: GUESS
-    // -------------------------------------------------------------------------
+    // ACTION: GUESS SINGLE-PLAYER
     if (payload.action === "guess") {
       const { sessionId, guess } = payload;
       if (!sessionId || typeof guess !== "number" || isNaN(guess)) {
@@ -181,7 +496,6 @@ serve(async (req: Request) => {
         );
       }
 
-      // Fetch active session and lock ownership
       const { data: session, error: fetchErr } = await admin
         .from("server_game_sessions")
         .select("*")
@@ -203,7 +517,6 @@ serve(async (req: Request) => {
         );
       }
 
-      // Enforce bounds
       if (guess < session.min_range || guess > session.max_range) {
         return new Response(
           JSON.stringify({ error: `Guess ${guess} is out of allowable range [${session.min_range}, ${session.max_range}].` }),
@@ -216,16 +529,13 @@ serve(async (req: Request) => {
       const elapsedMs = Math.max(1000, Date.now() - new Date(session.started_at).getTime());
       const secret = session.secret_number;
 
-      // Evaluate Guess against Server Secret
       if (guess === secret) {
-        // --- MATCH WON ---
         const config = DIFFICULTY_CONFIG[session.difficulty as keyof typeof DIFFICULTY_CONFIG] || DIFFICULTY_CONFIG.medium;
         const speedBonus = elapsedMs < 20000 ? 250 : elapsedMs < 40000 ? 120 : 0;
         const lifeBonus = session.lives_remaining * 100;
         const efficiencyBonus = Math.max(0, (10 - nextRounds) * 35);
         const calculatedScore = Math.floor((1000 + lifeBonus + efficiencyBonus + speedBonus) * config.multiplier);
 
-        // 1. Mark server session as won
         await admin
           .from("server_game_sessions")
           .update({
@@ -239,7 +549,6 @@ serve(async (req: Request) => {
           })
           .eq("id", sessionId);
 
-        // 2. Authoritative persistence in public.game_sessions (Marked server_verified!)
         await admin.from("game_sessions").insert({
           id: sessionId,
           user_id: user.id,
@@ -260,7 +569,6 @@ serve(async (req: Request) => {
           xp_awarded: 0,
         });
 
-        // 3. Process Authoritative Rewards via RPC
         let rewardResult: any = null;
         try {
           const { data: rData } = await admin.rpc("process_game_session_reward", {
@@ -271,7 +579,6 @@ serve(async (req: Request) => {
           console.warn("[game-session] Error invoking process_game_session_reward:", e.message);
         }
 
-        // 4. Update Competitive Rating if Ranked
         let competitiveResult: any = null;
         if (session.is_ranked) {
           try {
@@ -286,6 +593,21 @@ serve(async (req: Request) => {
             competitiveResult = cData;
           } catch (e: any) {
             console.warn("[game-session] Error updating competitive rating:", e.message);
+          }
+
+          // Live update player_season_stats and user_event_progress
+          try {
+            await admin.rpc("process_match_season_and_events", {
+              p_user_id: user.id,
+              p_session_id: sessionId,
+              p_won: true,
+              p_rounds: nextRounds,
+              p_elapsed_ms: elapsedMs,
+              p_mode: session.mode,
+              p_is_ranked: true,
+            });
+          } catch (e: any) {
+            console.warn("[game-session] Error processing season/event progress:", e.message);
           }
         }
 
@@ -306,14 +628,13 @@ serve(async (req: Request) => {
         );
       }
 
-      // --- WRONG GUESS ---
+      // WRONG GUESS SINGLE-PLAYER
       const nextLives = Math.max(0, session.lives_remaining - 1);
       const isLost = nextLives === 0;
       const feedback = guess < secret ? "low" : "high";
       const feedbacks = [...(session.guess_feedbacks || []), feedback];
 
       if (isLost) {
-        // --- MATCH LOST ---
         await admin
           .from("server_game_sessions")
           .update({
@@ -327,7 +648,6 @@ serve(async (req: Request) => {
           })
           .eq("id", sessionId);
 
-        // Persist verified loss session
         await admin.from("game_sessions").insert({
           id: sessionId,
           user_id: user.id,
@@ -380,7 +700,6 @@ serve(async (req: Request) => {
         );
       }
 
-      // --- GAME CONTINUES ---
       await admin
         .from("server_game_sessions")
         .update({
@@ -405,9 +724,7 @@ serve(async (req: Request) => {
       );
     }
 
-    // -------------------------------------------------------------------------
-    // ACTION: HINT
-    // -------------------------------------------------------------------------
+    // ACTION: HINT SINGLE-PLAYER
     if (payload.action === "hint") {
       const { sessionId } = payload;
       const { data: session } = await admin
@@ -465,9 +782,7 @@ serve(async (req: Request) => {
       );
     }
 
-    // -------------------------------------------------------------------------
-    // ACTION: ABANDON
-    // -------------------------------------------------------------------------
+    // ACTION: ABANDON SINGLE-PLAYER
     if (payload.action === "abandon") {
       const { sessionId } = payload;
       const { data: session } = await admin
@@ -491,7 +806,6 @@ serve(async (req: Request) => {
           .eq("id", sessionId);
 
         if (session.is_ranked) {
-          // 1. Insert verified loss session into game_sessions to satisfy foreign key for rating_history
           await admin.from("game_sessions").insert({
             id: sessionId,
             user_id: user.id,
@@ -512,7 +826,6 @@ serve(async (req: Request) => {
             xp_awarded: 0,
           });
 
-          // 2. Safely deduct competitive rating and log in rating_history
           try {
             await admin.rpc("update_player_competitive_rating", {
               p_user_id: user.id,
@@ -545,4 +858,3 @@ serve(async (req: Request) => {
     );
   }
 });
-

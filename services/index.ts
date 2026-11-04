@@ -24,4 +24,7 @@ export * from "./serverGameplay/ServerAuthoritativeGameService";
 export * from "./competitive/CompetitiveRatingService";
 export * from "./leaderboard/LeaderboardService";
 export * from "./matchmaking/MatchmakingService";
+export * from "./multiplayer/MultiplayerService";
+export * from "./tournament/TournamentService";
+export * from "./seasons/SeasonsService";
 export * from "@/lib/supabase";

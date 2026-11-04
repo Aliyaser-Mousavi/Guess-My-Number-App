@@ -12,7 +12,11 @@ export type AppScreen =
   | "profile"
   | "settings"
   | "howToPlay"
-  | "leaderboard";
+  | "leaderboard"
+  | "multiplayerLobby"
+  | "multiplayerGame"
+  | "tournaments"
+  | "seasons";
 
 // ==========================================
 // 1. Core Gameplay Results
@@ -38,6 +42,7 @@ export type SetupConfig = {
   player2Name?: string;
   isRanked?: boolean;
   serverSessionId?: string;
+  tournamentId?: string;
 };
 
 export type GameResult = {
