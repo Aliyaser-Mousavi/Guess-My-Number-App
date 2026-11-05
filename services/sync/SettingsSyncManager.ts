@@ -150,8 +150,8 @@ export function settingsToDbColumns(settings: Partial<Settings>): Record<string,
   if (settings.colorBlindMode !== undefined) map.color_blind_mode = settings.colorBlindMode;
   if (settings.reducedMotion !== undefined) map.reduced_motion = settings.reducedMotion;
   if (settings.leftHandedControls !== undefined) map.left_handed_controls = settings.leftHandedControls;
-  if (settings.language !== undefined) map.language = settings.language;
-  if (settings.digitFormat !== undefined) map.digit_format = settings.digitFormat;
+  map.language = "en";
+  map.digit_format = "latin";
   if (settings.notifications !== undefined) map.notifications = settings.notifications;
   return map;
 }
@@ -177,8 +177,8 @@ export function dbColumnsToSettings(row: Record<string, any>): Partial<Settings>
   if (row.color_blind_mode !== undefined && row.color_blind_mode !== null) s.colorBlindMode = row.color_blind_mode;
   if (row.reduced_motion !== undefined && row.reduced_motion !== null) s.reducedMotion = row.reduced_motion;
   if (row.left_handed_controls !== undefined && row.left_handed_controls !== null) s.leftHandedControls = row.left_handed_controls;
-  if (row.language !== undefined && row.language !== null) s.language = row.language;
-  if (row.digit_format !== undefined && row.digit_format !== null) s.digitFormat = row.digit_format;
+  s.language = "en";
+  s.digitFormat = "latin";
   if (row.notifications !== undefined && row.notifications !== null) s.notifications = row.notifications;
   return s;
 }

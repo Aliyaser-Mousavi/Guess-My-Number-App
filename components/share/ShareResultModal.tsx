@@ -30,7 +30,7 @@ export default function ShareResultModal({ visible, result, onClose }: Props) {
   const modeTitle = modeMeta?.title ?? result.mode;
   const timeStr = formatElapsed(result.elapsedMs);
 
-  const shareText = `🔮 Guess My Number — ${result.won ? "VICTORY!" : "Match Completed"}
+  const shareText = `🔮 MarsGuess — ${result.won ? "VICTORY!" : "Match Completed"}
 🏆 Score: ${result.score.toLocaleString()} pts
 🎮 Mode: ${modeTitle}
 ⚡ Difficulty: ${diff.label}
@@ -39,13 +39,13 @@ export default function ShareResultModal({ visible, result, onClose }: Props) {
 💡 Hints: ${result.hintsUsed}
 
 Can you beat my score?
-#GuessMyNumber #MidnightArcade`;
+#MarsGuess #MidnightArcade`;
 
   async function handleShare() {
     try {
       await Share.share({
         message: shareText,
-        title: "Guess My Number Match Result",
+        title: "MarsGuess Match Result",
       });
     } catch (err) {
       console.warn("Share error:", err);
@@ -82,7 +82,7 @@ Can you beat my score?
                 <View style={styles.brandRow}>
                   <View style={styles.brandBadge}>
                     <Ionicons name="sparkles" size={12} color={Colors.accent} />
-                    <Text style={styles.brandText}>GUESS MY NUMBER</Text>
+                    <Text style={styles.brandText}>MARSGUESS</Text>
                   </View>
                   <Text style={styles.arcadeTag}>MIDNIGHT ARCADE</Text>
                 </View>

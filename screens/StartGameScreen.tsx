@@ -44,7 +44,7 @@ export default function StartGameScreen({
 }: Props) {
   const { buzz, playSound, recommendation } = useGame();
   const { showAlert } = useAppAlert();
-  const { user, isGuest } = useAuth();
+  const { isGuest } = useAuth();
 
   const [mode, setMode] = useState<GameMode>("opponent");
   const [difficultyId, setDifficultyId] = useState<DifficultyId>("medium");

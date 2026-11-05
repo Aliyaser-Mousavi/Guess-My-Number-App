@@ -15,9 +15,7 @@ import { useGame } from "@/context/GameProvider";
 import { AcademyService } from "@/services/academy/AcademyService";
 import { CoachEngine } from "@/services/coach/CoachEngine";
 import type {
-  CoachEvaluationReport,
   IntelligentDailyChallenge,
-  PersonalizedRecommendation,
   TailoredPracticeChallenge,
 } from "@/types/coach";
 import type { GuessEvaluation } from "@/types/academy";
@@ -46,7 +44,7 @@ export default function StrategyCoachScreen({
   onBack,
   onNavigateToAcademy,
 }: Props) {
-  const { buzz, playSound, isRTL, history, awardProgressionXp } = useGame();
+  const { buzz, playSound, history, awardProgressionXp } = useGame();
 
   const [tab, setTab] = useState<CoachTab>("insights");
 
@@ -224,13 +222,13 @@ export default function StrategyCoachScreen({
     <ScreenBackground>
       <SafeAreaView style={styles.safeArea}>
         {/* Top Header */}
-        <View style={[styles.header, isRTL && styles.rowReverse]}>
+        <View style={styles.header}>
           <Pressable
             style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
             onPress={onBack}
           >
             <Ionicons
-              name={isRTL ? "chevron-forward" : "chevron-back"}
+              name="chevron-back"
               size={24}
               color={Colors.text}
             />
@@ -771,10 +769,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  rowReverse: {
-    flexDirection: "row-reverse",
-  },
-  backBtn: {
+    backBtn: {
     padding: 8,
   },
   pressed: {

@@ -1,15 +1,11 @@
 import PlayerAvatar from "@/components/profile/PlayerAvatar";
 import InteractiveTutorialModal from "@/components/tutorial/InteractiveTutorialModal";
-import PrimaryButton from "@/components/ui/PrimaryButton";
 import ScreenBackground from "@/components/ui/ScreenBackground";
-import StatChip from "@/components/ui/StatChip";
-import Title from "@/components/ui/Title";
 import Colors from "@/constants/colors";
 import { FontFamily, Radius } from "@/constants/theme";
 import { useGame } from "@/context/GameProvider";
-import { CosmeticsService } from "@/services/cosmetics/CosmeticsService";
-import { LocalizationService } from "@/services/localization/LocalizationService";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useState } from "react";
 import {
   Pressable,
@@ -19,6 +15,8 @@ import {
   View,
 } from "react-native";
 import Animated, {
+  Easing,
+  interpolate,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -71,77 +69,127 @@ export default function HomeScreen({
     updateSettings,
     buzz,
     playSound,
-    t,
     formatNumber,
-    isRTL,
   } = useGame();
+
   const [showTutorial, setShowTutorial] = useState(false);
+
   const winRate =
     stats.gamesPlayed === 0
       ? 0
       : Math.round((stats.gamesWon / stats.gamesPlayed) * 100);
 
-  // Gentle breathing glow on the hero oracle orb
-  const pulseScale = useSharedValue(1);
-  const ringOpacity = useSharedValue(0.4);
+  // Animations: Pulse, Radar Sweep, Floating Shimmer
+  const radarRotation = useSharedValue(0);
+  const breathAnim = useSharedValue(0);
+  const glowPulse = useSharedValue(0.4);
 
   useEffect(() => {
-    pulseScale.value = withRepeat(
+    // 360 degree continuous radar scan
+    radarRotation.value = withRepeat(
+      withTiming(360, { duration: 8000, easing: Easing.linear }),
+      -1,
+      false,
+    );
+
+    // Subtle breath motion
+    breathAnim.value = withRepeat(
       withSequence(
-        withTiming(1.05, { duration: 2200 }),
-        withTiming(1, { duration: 2200 }),
+        withTiming(1, { duration: 2400, easing: Easing.inOut(Easing.quad) }),
+        withTiming(0, { duration: 2400, easing: Easing.inOut(Easing.quad) }),
       ),
       -1,
       true,
     );
-    ringOpacity.value = withRepeat(
+
+    // Glow pulse for outer ambient halo
+    glowPulse.value = withRepeat(
       withSequence(
-        withTiming(0.8, { duration: 2200 }),
-        withTiming(0.3, { duration: 2200 }),
+        withTiming(0.85, { duration: 2000, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0.35, { duration: 2000, easing: Easing.inOut(Easing.sin) }),
       ),
       -1,
       true,
     );
-  }, [pulseScale, ringOpacity]);
+  }, [radarRotation, breathAnim, glowPulse]);
 
-  const animatedOrbStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pulseScale.value }],
+  const animatedScannerStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${radarRotation.value}deg` }],
   }));
 
-  const animatedRingStyle = useAnimatedStyle(() => ({
-    opacity: ringOpacity.value,
+  const animatedOrbStyle = useAnimatedStyle(() => {
+    const scale = interpolate(breathAnim.value, [0, 1], [0.97, 1.03]);
+    return {
+      transform: [{ scale }],
+    };
+  });
+
+  const animatedHaloStyle = useAnimatedStyle(() => ({
+    opacity: glowPulse.value,
   }));
+
+  const xpPercent = Math.min(
+    100,
+    Math.round(
+      (progression.currentXp / Math.max(1, progression.nextLevelXp)) * 100,
+    ),
+  );
 
   return (
     <ScreenBackground>
       <SafeAreaView style={styles.safe}>
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Header Action Bar */}
-          <View style={[styles.topRow, isRTL && styles.rowReverse]}>
-            <View style={[styles.badgePill, isRTL && styles.rowReverse]}>
-              <Ionicons name="sparkles" size={12} color={Colors.primary} />
-              <Text style={styles.badgePillText}>{t("midnight_arcade")}</Text>
-            </View>
-            <View style={[styles.headerIcons, isRTL && styles.rowReverse]}>
-              <Pressable
-                onPress={() => {
-                  buzz("light");
-                  playSound("button_click");
-                  onProfile();
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="Player Profile"
-                style={({ pressed }) => [
-                  styles.iconBtn,
-                  styles.profileIconBtn,
-                  pressed && styles.iconBtnPressed,
-                ]}
-              >
-                <PlayerAvatar avatarId={profile.avatarId} size={32} />
-              </Pressable>
+          {/* Top Header / Player Status Bar */}
+          <View style={styles.topBar}>
+            {/* Player Quick Identity Pill */}
+            <Pressable
+              onPress={() => {
+                buzz("light");
+                playSound("button_click");
+                onProfile();
+              }}
+              style={({ pressed }) => [
+                styles.identityPill,
+                pressed && styles.pressedScale,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="View player profile"
+            >
+              <View style={styles.avatarWrap}>
+                <PlayerAvatar avatarId={profile.avatarId} size={36} />
+                <View style={styles.levelBadgeMini}>
+                  <Text style={styles.levelBadgeMiniText}>
+                    {formatNumber(progression.level)}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.identityMeta}>
+                <Text style={styles.playerName} numberOfLines={1}>
+                  {profile.displayName}
+                </Text>
+                <View style={styles.tierIndicatorRow}>
+                  <Ionicons
+                    name={competitiveRank.tierIcon as any}
+                    size={11}
+                    color={competitiveRank.tierColor}
+                  />
+                  <Text
+                    style={[
+                      styles.tierIndicatorText,
+                      { color: competitiveRank.tierColor },
+                    ]}
+                  >
+                    {competitiveRank.label} • {formatNumber(competitiveRank.rating)}
+                  </Text>
+                </View>
+              </View>
+            </Pressable>
+
+            {/* Quick Utility Icon Actions */}
+            <View style={styles.utilityActions}>
               <Pressable
                 onPress={() => {
                   buzz("light");
@@ -149,18 +197,19 @@ export default function HomeScreen({
                   onHowTo();
                 }}
                 accessibilityRole="button"
-                accessibilityLabel="How to play"
+                accessibilityLabel="How to play guide"
                 style={({ pressed }) => [
-                  styles.iconBtn,
-                  pressed && styles.iconBtnPressed,
+                  styles.utilityBtn,
+                  pressed && styles.pressedScale,
                 ]}
               >
                 <Ionicons
-                  name="help-circle-outline"
-                  size={20}
+                  name="help-buoy-outline"
+                  size={19}
                   color={Colors.textMuted}
                 />
               </Pressable>
+
               <Pressable
                 onPress={() => {
                   buzz("light");
@@ -170,12 +219,12 @@ export default function HomeScreen({
                 accessibilityRole="button"
                 accessibilityLabel="Settings"
                 style={({ pressed }) => [
-                  styles.iconBtn,
-                  pressed && styles.iconBtnPressed,
+                  styles.utilityBtn,
+                  pressed && styles.pressedScale,
                 ]}
               >
                 <Ionicons
-                  name="settings-outline"
+                  name="cog-outline"
                   size={20}
                   color={Colors.textMuted}
                 />
@@ -183,589 +232,584 @@ export default function HomeScreen({
             </View>
           </View>
 
-          {/* Brand Header */}
-          <View style={styles.brandContainer}>
-            <Title size="display" style={styles.brandTitle}>
-              {t("app_title")}
-            </Title>
-            <Text style={styles.tagline}>
-              {t("tagline")}
-            </Text>
+          {/* New Player Tutorial Banner */}
+          {!settings.tutorialCompleted && stats.gamesPlayed === 0 && (
+            <Pressable
+              onPress={() => {
+                buzz("light");
+                playSound("button_click");
+                setShowTutorial(true);
+              }}
+              style={({ pressed }) => [
+                styles.tutorialBanner,
+                pressed && styles.pressedScale,
+              ]}
+            >
+              <LinearGradient
+                colors={["rgba(255, 184, 0, 0.18)", "rgba(255, 184, 0, 0.04)"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.tutorialBannerGradient}
+              >
+                <View style={styles.tutorialBadge}>
+                  <Ionicons name="sparkles" size={12} color={Colors.accent} />
+                  <Text style={styles.tutorialBadgeText}>RECRUIT PROTOCOL</Text>
+                </View>
+                <View style={styles.tutorialTextGroup}>
+                  <Text style={styles.tutorialTitle}>
+                    Interactive Strategy Guide
+                  </Text>
+                  <Text style={styles.tutorialSub}>
+                    Master deduction odds and high-precision guessing
+                  </Text>
+                </View>
+                <Ionicons
+                  name="arrow-forward-circle"
+                  size={22}
+                  color={Colors.accent}
+                />
+              </LinearGradient>
+            </Pressable>
+          )}
+
+          {/* HERO SECTION: The Quantum Oracle Chamber */}
+          <View style={styles.heroChamber}>
+            {/* Ambient Background Glow */}
+            <Animated.View style={[styles.ambientHalo, animatedHaloStyle]} />
+
+            {/* Radar / Tactical Coordinate Scanner Ring */}
+            <Animated.View
+              style={[styles.radarScannerContainer, animatedScannerStyle]}
+            >
+              <View style={styles.scannerLine} />
+              <View style={styles.scannerDot} />
+            </Animated.View>
+
+            {/* Concentric Calibration Circles */}
+            <View style={styles.concentricRingOuter} />
+            <View style={styles.concentricRingMid} />
+
+            {/* Core Animated Oracle Sphere */}
+            <Animated.View style={[styles.coreSphereWrap, animatedOrbStyle]}>
+              <LinearGradient
+                colors={[Colors.surfaceSoft, Colors.bgElevated, Colors.bg]}
+                style={styles.coreSphereGradient}
+              >
+                {/* Top Holographic Specular Shine */}
+                <View style={styles.specularShine} />
+
+                {/* Cyber Matrix Crosshairs */}
+                <View style={styles.crosshairVertical} />
+                <View style={styles.crosshairHorizontal} />
+
+                {/* Central Mystery Glyph with Dynamic Badging */}
+                <View style={styles.glyphCenter}>
+                  <Ionicons
+                    name="telescope-outline"
+                    size={28}
+                    color={Colors.primary}
+                    style={styles.glyphIcon}
+                  />
+                  <Text style={styles.oracleText}>ORACLE CORE</Text>
+                  <View style={styles.chamberStatusBadge}>
+                    <View style={styles.livePulseDot} />
+                    <Text style={styles.livePulseText}>ONLINE</Text>
+                  </View>
+                </View>
+              </LinearGradient>
+            </Animated.View>
+
+            {/* Chamber HUD Telemetry Labels */}
+            <View style={styles.chamberHudLeft}>
+              <Text style={styles.hudLabelKey}>SYSTEM</Text>
+              <Text style={styles.hudLabelVal}>MARS.NET</Text>
+            </View>
+            <View style={styles.chamberHudRight}>
+              <Text style={styles.hudLabelKey}>PROTOCOL</Text>
+              <Text style={styles.hudLabelVal}>HEX-09</Text>
+            </View>
           </View>
 
-          {/* Player Level & Rank Quick Banner */}
+          {/* Primary Action Button: Massive Cyberpunk Play CTA */}
+          <Pressable
+            onPress={() => {
+              buzz("medium");
+              playSound("button_click");
+              onPlay();
+            }}
+            style={({ pressed }) => [
+              styles.primaryCtaBtn,
+              pressed && styles.primaryCtaPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Play Game Now"
+          >
+            <LinearGradient
+              colors={[Colors.accent, "#E5A000", "#C68200"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.primaryCtaGradient}
+            >
+              <View style={styles.primaryCtaLeft}>
+                <View style={styles.playIconContainer}>
+                  <Ionicons name="play" size={24} color={Colors.accent} />
+                </View>
+                <View>
+                  <Text style={styles.primaryCtaHeading}>START GUESSING</Text>
+                  <Text style={styles.primaryCtaSub}>
+                    Classic • Time Attack • Blitz • Custom
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.primaryCtaChevron}>
+                <Ionicons
+                  name="chevron-forward"
+                  size={20}
+                  color={Colors.bg}
+                />
+              </View>
+            </LinearGradient>
+          </Pressable>
+
+          {/* Daily Challenge Card - Neon Pulsing Mission Card */}
           <Pressable
             onPress={() => {
               buzz("light");
               playSound("button_click");
-              onProfile();
+              onDaily();
             }}
             style={({ pressed }) => [
-              styles.levelBanner,
-              isRTL && styles.rowReverse,
-              pressed && styles.levelBannerPressed,
+              styles.dailyCard,
+              dailyDone && styles.dailyCardDone,
+              pressed && styles.pressedScale,
             ]}
             accessibilityRole="button"
-            accessibilityLabel="View player profile and rank"
+            accessibilityLabel="Daily Challenge"
           >
-            <View style={[styles.levelBannerLeft, isRTL && styles.rowReverse]}>
-              <PlayerAvatar avatarId={profile.avatarId} size={36} />
-              <View style={styles.levelBadge}>
-                <Text style={styles.levelBadgeText}>
-                  Lv.{formatNumber(progression.level)}
-                </Text>
-              </View>
-              <View style={[styles.levelTitleWrap, isRTL && { alignItems: "flex-end" }]}>
-                <Text style={styles.levelRankTitle}>
-                  {profile.displayName} • {CosmeticsService.getTitleName(profile.titleId) ?? progression.rankTitle}
-                </Text>
-                <View style={[styles.levelXpRow, isRTL && styles.rowReverse]}>
-                  <View style={styles.miniXpTrack}>
-                    <View
-                      style={[
-                        styles.miniXpFill,
-                        {
-                          width: `${Math.min(
-                            100,
-                            Math.round(
-                              (progression.currentXp /
-                                Math.max(1, progression.nextLevelXp)) *
-                                100,
-                            ),
-                          )}%`,
-                        },
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.miniXpText}>
-                    {formatNumber(progression.currentXp)}/{formatNumber(progression.nextLevelXp)} XP
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            <View
-              style={[
-                styles.rankPill,
-                {
-                  borderColor: competitiveRank.tierColor + "55",
-                  backgroundColor: competitiveRank.tierColor + "15",
-                },
-                isRTL && styles.rowReverse,
-              ]}
-            >
-              <Ionicons
-                name={competitiveRank.tierIcon as any}
-                size={12}
-                color={competitiveRank.tierColor}
-              />
-              <Text
-                style={[
-                  styles.rankPillText,
-                  { color: competitiveRank.tierColor },
-                ]}
-              >
-                {competitiveRank.label}
-              </Text>
-            </View>
-          </Pressable>
-
-          {/* Hero Oracle Element */}
-          <View style={styles.heroWrapper}>
-            <Animated.View style={[styles.heroOuterRing, animatedRingStyle]} />
-            <Animated.View style={[styles.heroOrb, animatedOrbStyle]}>
-              <View style={styles.orbInnerGlow} />
-              <Text style={styles.heroNumber}>?</Text>
-            </Animated.View>
-          </View>
-
-          {/* Primary Action Button (Play Now) */}
-          <View style={styles.actionsContainer}>
-            {!settings.tutorialCompleted && stats.gamesPlayed === 0 && (
-              <Pressable
-                onPress={() => {
-                  buzz("light");
-                  playSound("button_click");
-                  setShowTutorial(true);
-                }}
-                style={styles.tutorialPrompt}
-              >
-                <View style={styles.tutorialPromptBadge}>
-                  <Ionicons name="sparkles" size={13} color={Colors.accent} />
-                  <Text style={styles.tutorialPromptBadgeText}>NEW HUNTER?</Text>
-                </View>
-                <Text style={styles.tutorialPromptText}>
-                  Take the Interactive Tutorial & Strategy Walkthrough
-                </Text>
-                <Ionicons name="chevron-forward" size={16} color={Colors.accent} />
-              </Pressable>
-            )}
-
-            <PrimaryButton
-              onPress={() => {
-                playSound("button_click");
-                onPlay();
-              }}
-              variant="accent"
-              size="lg"
-              icon={<Ionicons name="play" size={20} color={Colors.bg} />}
-            >
-              {t("play_now")}
-            </PrimaryButton>
-
-            {/* Daily Challenge Action */}
-            <Pressable
-              onPress={() => {
-                buzz("light");
-                playSound("button_click");
-                onDaily();
-              }}
-              style={({ pressed }) => [
-                styles.dailyCard,
-                isRTL && styles.rowReverse,
-                dailyDone && styles.dailyCardDone,
-                pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
-              ]}
-            >
-              <View style={[styles.dailyLeft, isRTL && styles.rowReverse]}>
-                <View
-                  style={[
-                    styles.dailyIconWrap,
-                    dailyDone && styles.dailyIconWrapDone,
-                  ]}
-                >
-                  <Ionicons
-                    name={dailyDone ? "checkmark-circle" : "calendar"}
-                    size={18}
-                    color={dailyDone ? Colors.mint : Colors.primary}
-                  />
-                </View>
-                <View style={isRTL && { alignItems: "flex-end" }}>
-                  <Text style={styles.dailyTitle}>{t("daily_challenge")}</Text>
-                  <Text style={styles.dailySubtitle}>
-                    {dailyDone
-                      ? t("daily_completed")
-                      : t("daily_available")}
-                  </Text>
-                </View>
-              </View>
-              <Ionicons
-                name={LocalizationService.getChevronForward(settings.language)}
-                size={18}
-                color={Colors.textDim}
-              />
-            </Pressable>
-          </View>
-
-          {/* Quick Player Statistics Grid */}
-          <View style={styles.statsSection}>
-            <Text style={[styles.sectionHeader, isRTL && { textAlign: "right" }]}>
-              {t("player_snapshot")}
-            </Text>
-            <View style={styles.statsGrid}>
-              <StatChip
-                icon="flame"
-                label={t("streak")}
-                value={formatNumber(stats.currentStreak)}
-                color={Colors.coral}
-              />
-              <StatChip
-                icon="trophy"
-                label={t("best_score")}
-                value={formatNumber(stats.bestScore)}
-                color={Colors.accent}
-              />
-              <StatChip
-                icon="game-controller"
-                label={t("played")}
-                value={formatNumber(stats.gamesPlayed)}
-                color={Colors.primary}
-              />
-              <StatChip
-                icon="stats-chart"
-                label={t("win_rate")}
-                value={`${formatNumber(winRate)}%`}
-                color={Colors.mint}
-              />
-            </View>
-          </View>
-
-          {/* Secondary Hub Navigation */}
-          <View style={styles.navRow}>
-            {/* Player Profile Link */}
-            <Pressable
-              style={({ pressed }) => [
-                styles.navCard,
-                isRTL && styles.rowReverse,
-                pressed && styles.navCardPressed,
-              ]}
-              onPress={() => {
-                buzz("light");
-                playSound("button_click");
-                onProfile();
-              }}
+            <LinearGradient
+              colors={
+                dailyDone
+                  ? ["rgba(46, 213, 115, 0.12)", "rgba(46, 213, 115, 0.03)"]
+                  : ["rgba(0, 210, 180, 0.16)", "rgba(0, 210, 180, 0.04)"]
+              }
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.dailyGradient}
             >
               <View
                 style={[
-                  styles.navIconContainer,
-                  { backgroundColor: "rgba(0, 210, 180, 0.12)" },
+                  styles.dailyIconBox,
+                  dailyDone && styles.dailyIconBoxDone,
                 ]}
               >
-                <PlayerAvatar avatarId={profile.avatarId} size={28} />
+                <Ionicons
+                  name={dailyDone ? "checkmark-done-circle" : "calendar-sharp"}
+                  size={22}
+                  color={dailyDone ? Colors.mint : Colors.primary}
+                />
               </View>
-              <View style={[styles.navTextContainer, isRTL && { alignItems: "flex-end" }]}>
-                <Text style={styles.navLabel}>{t("profile")}</Text>
-                <Text style={styles.navMeta}>
-                  {profile.displayName} • {CosmeticsService.getTitleName(profile.titleId) ?? progression.rankTitle}
+
+              <View style={styles.dailyContent}>
+                <View style={styles.dailyTagRow}>
+                  <Text
+                    style={[
+                      styles.dailyTag,
+                      dailyDone && { color: Colors.mint },
+                    ]}
+                  >
+                    {dailyDone ? "DAILY MISSION COMPLETE" : "GLOBAL DAILY CIPHER"}
+                  </Text>
+                </View>
+                <Text style={styles.dailyTitle}>Daily Challenge</Text>
+                <Text style={styles.dailyDescription}>
+                  {dailyDone
+                    ? "Cipher solved for today • New target in 24h"
+                    : "One shared mystery number • Global ranking badge"}
                 </Text>
               </View>
-              <Ionicons
-                name={LocalizationService.getChevronForward(settings.language)}
-                size={16}
-                color={Colors.textDim}
-              />
-            </Pressable>
 
-            {/* Progression & Missions */}
+              <Ionicons
+                name="chevron-forward"
+                size={18}
+                color={dailyDone ? Colors.mint : Colors.primary}
+              />
+            </LinearGradient>
+          </Pressable>
+
+          {/* Quick HUD Metrics Strip (Level Progress & Snapshot) */}
+          <View style={styles.hudMetricsContainer}>
+            {/* Progression & XP Progress */}
             <Pressable
-              style={({ pressed }) => [
-                styles.navCard,
-                isRTL && styles.rowReverse,
-                pressed && styles.navCardPressed,
-              ]}
               onPress={() => {
                 buzz("light");
                 playSound("button_click");
                 onProgression();
               }}
+              style={({ pressed }) => [
+                styles.hudProgressionCard,
+                pressed && styles.pressedScale,
+              ]}
             >
-              <View
-                style={[
-                  styles.navIconContainer,
-                  { backgroundColor: "rgba(255, 184, 0, 0.12)" },
-                ]}
-              >
-                <Ionicons name="trophy" size={20} color={Colors.accent} />
-              </View>
-              <View style={[styles.navTextContainer, isRTL && { alignItems: "flex-end" }]}>
-                <Text style={styles.navLabel}>{t("progression_hub")}</Text>
-                <Text style={styles.navMeta}>
-                  Lv. {formatNumber(progression.level)} • {competitiveRank.label}
+              <View style={styles.hudProgressionHeader}>
+                <View style={styles.hudLevelTag}>
+                  <Ionicons name="trophy" size={13} color={Colors.accent} />
+                  <Text style={styles.hudLevelText}>
+                    Lv.{formatNumber(progression.level)}
+                  </Text>
+                </View>
+                <Text style={styles.hudXpFraction}>
+                  {formatNumber(progression.currentXp)} / {formatNumber(progression.nextLevelXp)} XP
                 </Text>
               </View>
-              <Ionicons
-                name={LocalizationService.getChevronForward(settings.language)}
-                size={16}
-                color={Colors.textDim}
-              />
+
+              <View style={styles.xpTrack}>
+                <View style={[styles.xpFill, { width: `${xpPercent}%` }]} />
+              </View>
             </Pressable>
 
-            {/* Global Ranked Leaderboard */}
-            {onLeaderboard && (
+            {/* Quick 4-Stat Strip */}
+            <View style={styles.statsStripGrid}>
+              <View style={styles.statStripItem}>
+                <Ionicons name="flame" size={15} color={Colors.coral} />
+                <Text style={styles.statStripVal}>
+                  {formatNumber(stats.currentStreak)}
+                </Text>
+                <Text style={styles.statStripLabel}>Streak</Text>
+              </View>
+
+              <View style={styles.statStripItem}>
+                <Ionicons name="ribbon" size={15} color={Colors.accent} />
+                <Text style={styles.statStripVal}>
+                  {formatNumber(stats.bestScore)}
+                </Text>
+                <Text style={styles.statStripLabel}>Best Score</Text>
+              </View>
+
+              <View style={styles.statStripItem}>
+                <Ionicons name="game-controller" size={15} color={Colors.primary} />
+                <Text style={styles.statStripVal}>
+                  {formatNumber(stats.gamesPlayed)}
+                </Text>
+                <Text style={styles.statStripLabel}>Played</Text>
+              </View>
+
+              <View style={styles.statStripItem}>
+                <Ionicons name="trending-up" size={15} color={Colors.mint} />
+                <Text style={styles.statStripVal}>{formatNumber(winRate)}%</Text>
+                <Text style={styles.statStripLabel}>Win Rate</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Section: Competitive & Multiplayer Arena */}
+          <View style={styles.sectionBlock}>
+            <View style={styles.sectionHeaderRow}>
+              <Ionicons name="flash-outline" size={16} color={Colors.primary} />
+              <Text style={styles.sectionHeading}>COMPETITIVE ARENA</Text>
+            </View>
+
+            <View style={styles.grid2Col}>
+              {/* 1v1 Battle */}
+              {onMultiplayer && (
+                <Pressable
+                  onPress={() => {
+                    buzz("light");
+                    playSound("button_click");
+                    onMultiplayer();
+                  }}
+                  style={({ pressed }) => [
+                    styles.featureTile,
+                    pressed && styles.pressedScale,
+                  ]}
+                >
+                  <LinearGradient
+                    colors={["rgba(0, 210, 180, 0.15)", "rgba(0, 210, 180, 0.02)"]}
+                    style={styles.featureTileGradient}
+                  >
+                    <View style={styles.featureTileTop}>
+                      <View
+                        style={[
+                          styles.tileIconBox,
+                          { backgroundColor: "rgba(0, 210, 180, 0.18)" },
+                        ]}
+                      >
+                        <Ionicons name="flash" size={18} color={Colors.primary} />
+                      </View>
+                      <View style={styles.liveBadge}>
+                        <Text style={styles.liveBadgeText}>LIVE</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.tileTitle}>1v1 Battle</Text>
+                    <Text style={styles.tileSub}>Real-time PvP Duel</Text>
+                  </LinearGradient>
+                </Pressable>
+              )}
+
+              {/* Tournaments */}
+              {onTournaments && (
+                <Pressable
+                  onPress={() => {
+                    buzz("light");
+                    playSound("button_click");
+                    onTournaments();
+                  }}
+                  style={({ pressed }) => [
+                    styles.featureTile,
+                    pressed && styles.pressedScale,
+                  ]}
+                >
+                  <LinearGradient
+                    colors={["rgba(255, 82, 82, 0.15)", "rgba(255, 82, 82, 0.02)"]}
+                    style={styles.featureTileGradient}
+                  >
+                    <View style={styles.featureTileTop}>
+                      <View
+                        style={[
+                          styles.tileIconBox,
+                          { backgroundColor: "rgba(255, 82, 82, 0.18)" },
+                        ]}
+                      >
+                        <Ionicons name="trophy" size={18} color={Colors.coral} />
+                      </View>
+                      <View style={[styles.liveBadge, { borderColor: Colors.coral }]}>
+                        <Text style={[styles.liveBadgeText, { color: Colors.coral }]}>
+                          CUP
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.tileTitle}>Tournaments</Text>
+                    <Text style={styles.tileSub}>Weekly Championship</Text>
+                  </LinearGradient>
+                </Pressable>
+              )}
+
+              {/* Seasons */}
+              {onSeasons && (
+                <Pressable
+                  onPress={() => {
+                    buzz("light");
+                    playSound("button_click");
+                    onSeasons();
+                  }}
+                  style={({ pressed }) => [
+                    styles.featureTile,
+                    pressed && styles.pressedScale,
+                  ]}
+                >
+                  <LinearGradient
+                    colors={["rgba(168, 85, 247, 0.15)", "rgba(168, 85, 247, 0.02)"]}
+                    style={styles.featureTileGradient}
+                  >
+                    <View style={styles.featureTileTop}>
+                      <View
+                        style={[
+                          styles.tileIconBox,
+                          { backgroundColor: "rgba(168, 85, 247, 0.18)" },
+                        ]}
+                      >
+                        <Ionicons name="planet" size={18} color="#A855F7" />
+                      </View>
+                      <View style={[styles.liveBadge, { borderColor: "#A855F7" }]}>
+                        <Text style={[styles.liveBadgeText, { color: "#A855F7" }]}>
+                          S1
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.tileTitle}>Season 1 Hub</Text>
+                    <Text style={styles.tileSub}>Rank Rewards & Passes</Text>
+                  </LinearGradient>
+                </Pressable>
+              )}
+
+              {/* Leaderboard */}
+              {onLeaderboard && (
+                <Pressable
+                  onPress={() => {
+                    buzz("light");
+                    playSound("button_click");
+                    onLeaderboard();
+                  }}
+                  style={({ pressed }) => [
+                    styles.featureTile,
+                    pressed && styles.pressedScale,
+                  ]}
+                >
+                  <LinearGradient
+                    colors={["rgba(255, 184, 0, 0.15)", "rgba(255, 184, 0, 0.02)"]}
+                    style={styles.featureTileGradient}
+                  >
+                    <View style={styles.featureTileTop}>
+                      <View
+                        style={[
+                          styles.tileIconBox,
+                          { backgroundColor: "rgba(255, 184, 0, 0.18)" },
+                        ]}
+                      >
+                        <Ionicons name="podium" size={18} color={Colors.accent} />
+                      </View>
+                      <View style={[styles.liveBadge, { borderColor: Colors.accent }]}>
+                        <Text style={[styles.liveBadgeText, { color: Colors.accent }]}>
+                          TOP
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.tileTitle}>Leaderboard</Text>
+                    <Text style={styles.tileSub}>Global Standings</Text>
+                  </LinearGradient>
+                </Pressable>
+              )}
+            </View>
+          </View>
+
+          {/* Section: Training & Tactical Mastery */}
+          <View style={styles.sectionBlock}>
+            <View style={styles.sectionHeaderRow}>
+              <Ionicons name="hardware-chip-outline" size={16} color={Colors.cyan} />
+              <Text style={styles.sectionHeading}>TACTICAL LAB & TRAINING</Text>
+            </View>
+
+            <View style={styles.rowCardsContainer}>
+              {/* AI Coach */}
+              {onCoach && (
+                <Pressable
+                  onPress={() => {
+                    buzz("light");
+                    playSound("button_click");
+                    onCoach();
+                  }}
+                  style={({ pressed }) => [
+                    styles.horizontalNavRow,
+                    pressed && styles.pressedScale,
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.rowIconCircle,
+                      { backgroundColor: "rgba(0, 229, 255, 0.14)" },
+                    ]}
+                  >
+                    <Ionicons
+                      name="hardware-chip"
+                      size={20}
+                      color={Colors.cyan}
+                    />
+                  </View>
+                  <View style={styles.rowTextWrap}>
+                    <Text style={styles.rowTitle}>AI Strategy Coach</Text>
+                    <Text style={styles.rowSub}>
+                      Algorithmic Diagnostics & Mistake Analysis
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={16}
+                    color={Colors.textDim}
+                  />
+                </Pressable>
+              )}
+
+              {/* Number Academy */}
+              {onAcademy && (
+                <Pressable
+                  onPress={() => {
+                    buzz("light");
+                    playSound("button_click");
+                    onAcademy();
+                  }}
+                  style={({ pressed }) => [
+                    styles.horizontalNavRow,
+                    pressed && styles.pressedScale,
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.rowIconCircle,
+                      { backgroundColor: "rgba(0, 210, 180, 0.14)" },
+                    ]}
+                  >
+                    <Ionicons name="school" size={20} color={Colors.primary} />
+                  </View>
+                  <View style={styles.rowTextWrap}>
+                    <Text style={styles.rowTitle}>Number Academy</Text>
+                    <Text style={styles.rowSub}>
+                      Interactive Lessons, Binary Search & Drills
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={16}
+                    color={Colors.textDim}
+                  />
+                </Pressable>
+              )}
+
+              {/* Badges / Achievements */}
               <Pressable
-                style={({ pressed }) => [
-                  styles.navCard,
-                  isRTL && styles.rowReverse,
-                  pressed && styles.navCardPressed,
-                ]}
                 onPress={() => {
                   buzz("light");
                   playSound("button_click");
-                  onLeaderboard();
+                  onAchievements();
                 }}
+                style={({ pressed }) => [
+                  styles.horizontalNavRow,
+                  pressed && styles.pressedScale,
+                ]}
               >
                 <View
                   style={[
-                    styles.navIconContainer,
+                    styles.rowIconCircle,
+                    { backgroundColor: "rgba(168, 85, 247, 0.14)" },
+                  ]}
+                >
+                  <Ionicons name="medal" size={20} color="#A855F7" />
+                </View>
+                <View style={styles.rowTextWrap}>
+                  <Text style={styles.rowTitle}>Badges & Achievements</Text>
+                  <Text style={styles.rowSub}>
+                    {formatNumber(stats.unlockedAchievements.length)} / 25 Badges Claimed
+                  </Text>
+                </View>
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={Colors.textDim}
+                />
+              </Pressable>
+
+              {/* Analytics / Full Stats */}
+              <Pressable
+                onPress={() => {
+                  buzz("light");
+                  playSound("button_click");
+                  onStats();
+                }}
+                style={({ pressed }) => [
+                  styles.horizontalNavRow,
+                  pressed && styles.pressedScale,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.rowIconCircle,
                     { backgroundColor: "rgba(255, 184, 0, 0.14)" },
                   ]}
                 >
-                  <Ionicons name="podium" size={20} color={Colors.accent} />
+                  <Ionicons name="stats-chart" size={20} color={Colors.accent} />
                 </View>
-                <View
-                  style={[
-                    styles.navTextContainer,
-                    isRTL && { alignItems: "flex-end" },
-                  ]}
-                >
-                  <Text style={styles.navLabel}>Leaderboard</Text>
-                  <Text style={styles.navMeta}>
-                    Global Ranked Standings • {competitiveRank.label}
+                <View style={styles.rowTextWrap}>
+                  <Text style={styles.rowTitle}>Full Lifetime Statistics</Text>
+                  <Text style={styles.rowSub}>
+                    Guess Distribution, Timers & Win Trends
                   </Text>
                 </View>
                 <Ionicons
-                  name={LocalizationService.getChevronForward(settings.language)}
+                  name="chevron-forward"
                   size={16}
                   color={Colors.textDim}
                 />
               </Pressable>
-            )}
-
-            {/* 1v1 Online Battle (Multiplayer) */}
-            {onMultiplayer && (
-              <Pressable
-                style={({ pressed }) => [
-                  styles.navCard,
-                  isRTL && styles.rowReverse,
-                  pressed && styles.navCardPressed,
-                ]}
-                onPress={() => {
-                  buzz("light");
-                  playSound("button_click");
-                  onMultiplayer();
-                }}
-              >
-                <View
-                  style={[
-                    styles.navIconContainer,
-                    { backgroundColor: "rgba(0, 210, 180, 0.15)" },
-                  ]}
-                >
-                  <Ionicons name="flash" size={20} color={Colors.primary} />
-                </View>
-                <View
-                  style={[
-                    styles.navTextContainer,
-                    isRTL && { alignItems: "flex-end" },
-                  ]}
-                >
-                  <Text style={styles.navLabel}>1v1 Online Battle</Text>
-                  <Text style={styles.navMeta}>
-                    Real-time Skill-Based Matchmaking & Rooms
-                  </Text>
-                </View>
-                <Ionicons
-                  name={LocalizationService.getChevronForward(settings.language)}
-                  size={16}
-                  color={Colors.textDim}
-                />
-              </Pressable>
-            )}
-
-            {/* Weekly Tournaments */}
-            {onTournaments && (
-              <Pressable
-                style={({ pressed }) => [
-                  styles.navCard,
-                  isRTL && styles.rowReverse,
-                  pressed && styles.navCardPressed,
-                ]}
-                onPress={() => {
-                  buzz("light");
-                  playSound("button_click");
-                  onTournaments();
-                }}
-              >
-                <View
-                  style={[
-                    styles.navIconContainer,
-                    { backgroundColor: "rgba(255, 92, 114, 0.14)" },
-                  ]}
-                >
-                  <Ionicons name="trophy" size={20} color={Colors.coral} />
-                </View>
-                <View
-                  style={[
-                    styles.navTextContainer,
-                    isRTL && { alignItems: "flex-end" },
-                  ]}
-                >
-                  <Text style={styles.navLabel}>Tournaments</Text>
-                  <Text style={styles.navMeta}>
-                    Weekly Oracle Championship • Limited Tries
-                  </Text>
-                </View>
-                <Ionicons
-                  name={LocalizationService.getChevronForward(settings.language)}
-                  size={16}
-                  color={Colors.textDim}
-                />
-              </Pressable>
-            )}
-
-            {/* Competitive Seasons */}
-            {onSeasons && (
-              <Pressable
-                style={({ pressed }) => [
-                  styles.navCard,
-                  isRTL && styles.rowReverse,
-                  pressed && styles.navCardPressed,
-                ]}
-                onPress={() => {
-                  buzz("light");
-                  playSound("button_click");
-                  onSeasons();
-                }}
-              >
-                <View
-                  style={[
-                    styles.navIconContainer,
-                    { backgroundColor: "rgba(168, 85, 247, 0.15)" },
-                  ]}
-                >
-                  <Ionicons name="planet" size={20} color="#A855F7" />
-                </View>
-                <View
-                  style={[
-                    styles.navTextContainer,
-                    isRTL && { alignItems: "flex-end" },
-                  ]}
-                >
-                  <Text style={styles.navLabel}>Season 1 Hub</Text>
-                  <Text style={styles.navMeta}>
-                    Tier Rewards, Soft-Reset & Event Protocols
-                  </Text>
-                </View>
-                <Ionicons
-                  name={LocalizationService.getChevronForward(settings.language)}
-                  size={16}
-                  color={Colors.textDim}
-                />
-              </Pressable>
-            )}
-
-            {/* AI Strategy Coach */}
-            {onCoach && (
-              <Pressable
-                style={({ pressed }) => [
-                  styles.navCard,
-                  isRTL && styles.rowReverse,
-                  pressed && styles.navCardPressed,
-                ]}
-                onPress={() => {
-                  buzz("light");
-                  playSound("button_click");
-                  onCoach();
-                }}
-              >
-                <View
-                  style={[
-                    styles.navIconContainer,
-                    { backgroundColor: "rgba(0, 210, 180, 0.15)" },
-                  ]}
-                >
-                  <Ionicons name="hardware-chip" size={20} color={Colors.primary} />
-                </View>
-                <View
-                  style={[
-                    styles.navTextContainer,
-                    isRTL && { alignItems: "flex-end" },
-                  ]}
-                >
-                  <Text style={styles.navLabel}>AI Strategy Coach</Text>
-                  <Text style={styles.navMeta}>
-                    Tactical Diagnostics, Weakness Drills & Daily Logic
-                  </Text>
-                </View>
-                <Ionicons
-                  name={LocalizationService.getChevronForward(settings.language)}
-                  size={16}
-                  color={Colors.textDim}
-                />
-              </Pressable>
-            )}
-
-            {/* Number Academy */}
-            {onAcademy && (
-              <Pressable
-                style={({ pressed }) => [
-                  styles.navCard,
-                  isRTL && styles.rowReverse,
-                  pressed && styles.navCardPressed,
-                ]}
-                onPress={() => {
-                  buzz("light");
-                  playSound("button_click");
-                  onAcademy();
-                }}
-              >
-                <View
-                  style={[
-                    styles.navIconContainer,
-                    { backgroundColor: "rgba(0, 210, 180, 0.15)" },
-                  ]}
-                >
-                  <Ionicons name="school" size={20} color={Colors.primary} />
-                </View>
-                <View
-                  style={[
-                    styles.navTextContainer,
-                    isRTL && { alignItems: "flex-end" },
-                  ]}
-                >
-                  <Text style={styles.navLabel}>Number Academy</Text>
-                  <Text style={styles.navMeta}>
-                    Strategy Training, Practice Lab & Daily Brain Drills
-                  </Text>
-                </View>
-                <Ionicons
-                  name={LocalizationService.getChevronForward(settings.language)}
-                  size={16}
-                  color={Colors.textDim}
-                />
-              </Pressable>
-            )}
-
-            {/* Full Stats */}
-            <Pressable
-              style={({ pressed }) => [
-                styles.navCard,
-                isRTL && styles.rowReverse,
-                pressed && styles.navCardPressed,
-              ]}
-              onPress={() => {
-                buzz("light");
-                playSound("button_click");
-                onStats();
-              }}
-            >
-              <View style={styles.navIconContainer}>
-                <Ionicons name="bar-chart" size={20} color={Colors.primary} />
-              </View>
-              <View style={[styles.navTextContainer, isRTL && { alignItems: "flex-end" }]}>
-                <Text style={styles.navLabel}>{t("full_stats")}</Text>
-                <Text style={styles.navMeta}>{t("lifetime_analytics")}</Text>
-              </View>
-              <Ionicons
-                name={LocalizationService.getChevronForward(settings.language)}
-                size={16}
-                color={Colors.textDim}
-              />
-            </Pressable>
-
-            {/* Badges */}
-            <Pressable
-              style={({ pressed }) => [
-                styles.navCard,
-                isRTL && styles.rowReverse,
-                pressed && styles.navCardPressed,
-              ]}
-              onPress={() => {
-                buzz("light");
-                playSound("button_click");
-                onAchievements();
-              }}
-            >
-              <View
-                style={[
-                  styles.navIconContainer,
-                  { backgroundColor: "rgba(168, 85, 247, 0.12)" },
-                ]}
-              >
-                <Ionicons name="ribbon" size={20} color="#a855f7" />
-              </View>
-              <View style={[styles.navTextContainer, isRTL && { alignItems: "flex-end" }]}>
-                <Text style={styles.navLabel}>{t("badges")}</Text>
-                <Text style={styles.navMeta}>
-                  {formatNumber(stats.unlockedAchievements.length)} / {formatNumber(25)} Unlocked
-                </Text>
-              </View>
-              <Ionicons
-                name={LocalizationService.getChevronForward(settings.language)}
-                size={16}
-                color={Colors.textDim}
-              />
-            </Pressable>
+            </View>
           </View>
         </ScrollView>
 
@@ -784,337 +828,583 @@ export default function HomeScreen({
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  content: {
-    paddingHorizontal: 20,
+  safe: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 18,
     paddingTop: 8,
-    paddingBottom: 36,
+    paddingBottom: 40,
+    gap: 16,
   },
-  topRow: {
+  pressedScale: {
+    opacity: 0.85,
+    transform: [{ scale: 0.98 }],
+  },
+
+  /* Top Bar */
+  topBar: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 4,
   },
-  badgePill: {
+  identityPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
+    gap: 10,
+    backgroundColor: Colors.bgElevated,
     paddingVertical: 5,
+    paddingHorizontal: 8,
     borderRadius: Radius.full,
-    backgroundColor: "rgba(0, 210, 180, 0.1)",
     borderWidth: 1,
-    borderColor: "rgba(0, 210, 180, 0.25)",
-  },
-  badgePillText: {
-    fontFamily: FontFamily.bodyBold,
-    color: Colors.primary,
-    fontSize: 10,
-    letterSpacing: 1.2,
-  },
-  headerIcons: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  iconBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  iconBtnPressed: {
-    backgroundColor: Colors.surfaceSoft,
     borderColor: Colors.borderStrong,
   },
-  brandContainer: {
-    alignItems: "center",
-    marginBottom: 20,
+  avatarWrap: {
+    position: "relative",
   },
-  brandTitle: {
-    color: Colors.text,
-    textAlign: "center",
-  },
-  tagline: {
-    fontFamily: FontFamily.body,
-    color: Colors.textMuted,
-    textAlign: "center",
-    marginTop: 8,
-    lineHeight: 21,
-    fontSize: 14,
-    paddingHorizontal: 12,
-  },
-  heroWrapper: {
-    alignItems: "center",
-    justifyContent: "center",
-    marginVertical: 12,
-    height: 140,
-  },
-  heroOuterRing: {
+  levelBadgeMini: {
     position: "absolute",
-    width: 148,
-    height: 148,
-    borderRadius: 74,
+    bottom: -3,
+    right: -4,
+    backgroundColor: Colors.accent,
+    borderRadius: Radius.full,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
     borderWidth: 1.5,
-    borderColor: Colors.primary,
+    borderColor: Colors.bg,
   },
-  heroOrb: {
-    width: 116,
-    height: 116,
-    borderRadius: 58,
-    backgroundColor: Colors.bgElevated,
-    borderWidth: 2,
-    borderColor: Colors.accent,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: Colors.accent,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 18,
-    elevation: 8,
+  levelBadgeMiniText: {
+    fontFamily: FontFamily.monoBold,
+    fontSize: 9,
+    color: Colors.bg,
   },
-  orbInnerGlow: {
-    position: "absolute",
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: Colors.accentGlow,
+  identityMeta: {
+    paddingRight: 6,
   },
-  heroNumber: {
-    fontFamily: FontFamily.display,
-    fontSize: 56,
-    lineHeight: 62,
-    color: Colors.accent,
+  playerName: {
+    fontFamily: FontFamily.displaySemiBold,
+    fontSize: 13,
+    color: Colors.text,
   },
-  actionsContainer: {
-    gap: 10,
-    marginTop: 8,
-    marginBottom: 20,
-  },
-  tutorialPrompt: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255, 184, 0, 0.08)",
-    borderRadius: Radius.md,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255, 184, 0, 0.35)",
-    gap: 8,
-  },
-  tutorialPromptBadge: {
+  tierIndicatorRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "rgba(255, 184, 0, 0.2)",
-    paddingVertical: 2,
-    paddingHorizontal: 6,
+    marginTop: 1,
+  },
+  tierIndicatorText: {
+    fontFamily: FontFamily.monoMedium,
+    fontSize: 10,
+    letterSpacing: 0.2,
+  },
+  utilityActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  utilityBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.bgElevated,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+
+  /* Tutorial Banner */
+  tutorialBanner: {
+    borderRadius: Radius.md,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255, 184, 0, 0.4)",
+  },
+  tutorialBannerGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    gap: 12,
+  },
+  tutorialBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(255, 184, 0, 0.15)",
+    paddingVertical: 3,
+    paddingHorizontal: 7,
     borderRadius: Radius.xs,
   },
-  tutorialPromptBadgeText: {
-    fontFamily: FontFamily.bodyBold,
-    color: Colors.accent,
+  tutorialBadgeText: {
+    fontFamily: FontFamily.monoBold,
     fontSize: 9,
-    letterSpacing: 1,
+    color: Colors.accent,
+    letterSpacing: 0.8,
   },
-  tutorialPromptText: {
+  tutorialTextGroup: {
     flex: 1,
-    fontFamily: FontFamily.bodyMedium,
+  },
+  tutorialTitle: {
+    fontFamily: FontFamily.sansBold,
+    fontSize: 12,
     color: Colors.text,
-    fontSize: 11,
   },
-  dailyCard: {
-    flexDirection: "row",
+  tutorialSub: {
+    fontFamily: FontFamily.sans,
+    fontSize: 10,
+    color: Colors.textMuted,
+    marginTop: 1,
+  },
+
+  /* HERO CHAMBER */
+  heroChamber: {
+    position: "relative",
     alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: Colors.borderStrong,
+    justifyContent: "center",
+    height: 240,
+    marginVertical: 14,
+    paddingVertical: 10,
   },
-  dailyCardDone: {
-    borderColor: "rgba(46, 213, 115, 0.3)",
-    backgroundColor: "rgba(46, 213, 115, 0.05)",
-  },
-  dailyLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    flex: 1,
-  },
-  dailyIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: Radius.sm,
+  ambientHalo: {
+    position: "absolute",
+    width: 230,
+    height: 230,
+    borderRadius: 115,
     backgroundColor: "rgba(0, 210, 180, 0.12)",
+  },
+  concentricRingOuter: {
+    position: "absolute",
+    width: 190,
+    height: 190,
+    borderRadius: 95,
+    borderWidth: 1,
+    borderColor: "rgba(0, 210, 180, 0.2)",
+    borderStyle: "dashed",
+  },
+  concentricRingMid: {
+    position: "absolute",
+    width: 156,
+    height: 156,
+    borderRadius: 78,
+    borderWidth: 1,
+    borderColor: "rgba(255, 184, 0, 0.18)",
+  },
+  radarScannerContainer: {
+    position: "absolute",
+    width: 190,
+    height: 190,
+    borderRadius: 95,
+    alignItems: "center",
+    justifyContent: "flex-start",
+  },
+  scannerLine: {
+    width: 1,
+    height: 95,
+    backgroundColor: "rgba(0, 210, 180, 0.6)",
+  },
+  scannerDot: {
+    position: "absolute",
+    top: 0,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.primary,
+    shadowColor: Colors.primary,
+    shadowOpacity: 0.9,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  coreSphereWrap: {
+    width: 122,
+    height: 122,
+    borderRadius: 61,
+    borderWidth: 2,
+    borderColor: Colors.primary,
+    overflow: "hidden",
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 18,
+    elevation: 8,
+  },
+  coreSphereGradient: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  specularShine: {
+    position: "absolute",
+    top: 6,
+    left: 20,
+    right: 20,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+  },
+  crosshairVertical: {
+    position: "absolute",
+    top: 10,
+    bottom: 10,
+    width: 1,
+    backgroundColor: "rgba(0, 210, 180, 0.15)",
+  },
+  crosshairHorizontal: {
+    position: "absolute",
+    left: 10,
+    right: 10,
+    height: 1,
+    backgroundColor: "rgba(0, 210, 180, 0.15)",
+  },
+  glyphCenter: {
     alignItems: "center",
     justifyContent: "center",
   },
-  dailyIconWrapDone: {
-    backgroundColor: "rgba(46, 213, 115, 0.15)",
+  glyphIcon: {
+    marginBottom: 4,
   },
-  dailyTitle: {
-    fontFamily: FontFamily.bodyBold,
+  oracleText: {
+    fontFamily: FontFamily.display,
+    fontSize: 10,
     color: Colors.text,
-    fontSize: 14,
+    letterSpacing: 2,
   },
-  dailySubtitle: {
-    fontFamily: FontFamily.body,
+  chamberStatusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(46, 213, 115, 0.18)",
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: Radius.full,
+    marginTop: 4,
+  },
+  livePulseDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.mint,
+  },
+  livePulseText: {
+    fontFamily: FontFamily.monoBold,
+    fontSize: 8,
+    color: Colors.mint,
+    letterSpacing: 0.6,
+  },
+  chamberHudLeft: {
+    position: "absolute",
+    left: 12,
+    bottom: 12,
+  },
+  chamberHudRight: {
+    position: "absolute",
+    right: 12,
+    bottom: 12,
+    alignItems: "flex-end",
+  },
+  hudLabelKey: {
+    fontFamily: FontFamily.mono,
+    fontSize: 8,
     color: Colors.textDim,
-    fontSize: 12,
+    letterSpacing: 1,
+  },
+  hudLabelVal: {
+    fontFamily: FontFamily.monoBold,
+    fontSize: 10,
+    color: Colors.textMuted,
+  },
+
+  /* Primary CTA Button */
+  primaryCtaBtn: {
+    borderRadius: Radius.lg,
+    overflow: "hidden",
+    shadowColor: Colors.accent,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    elevation: 6,
+  },
+  primaryCtaPressed: {
+    opacity: 0.9,
+    transform: [{ scale: 0.985 }],
+  },
+  primaryCtaGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+  },
+  primaryCtaLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  playIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.bg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  primaryCtaHeading: {
+    fontFamily: FontFamily.display,
+    fontSize: 18,
+    color: Colors.bg,
+    letterSpacing: 0.8,
+  },
+  primaryCtaSub: {
+    fontFamily: FontFamily.bodyBold,
+    fontSize: 11,
+    color: "rgba(7, 14, 24, 0.75)",
     marginTop: 2,
   },
-  statsSection: {
-    marginTop: 4,
-    marginBottom: 16,
+  primaryCtaChevron: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(7, 14, 24, 0.12)",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  sectionHeader: {
-    fontFamily: FontFamily.bodyBold,
-    color: Colors.textDim,
+
+  /* Daily Card */
+  dailyCard: {
+    borderRadius: Radius.lg,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(0, 210, 180, 0.3)",
+    backgroundColor: Colors.surface,
+  },
+  dailyCardDone: {
+    borderColor: "rgba(46, 213, 115, 0.3)",
+  },
+  dailyGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    gap: 12,
+  },
+  dailyIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.md,
+    backgroundColor: "rgba(0, 210, 180, 0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(0, 210, 180, 0.25)",
+  },
+  dailyIconBoxDone: {
+    backgroundColor: "rgba(46, 213, 115, 0.12)",
+    borderColor: "rgba(46, 213, 115, 0.25)",
+  },
+  dailyContent: {
+    flex: 1,
+  },
+  dailyTagRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 2,
+  },
+  dailyTag: {
+    fontFamily: FontFamily.monoBold,
+    fontSize: 9,
+    color: Colors.primary,
+    letterSpacing: 1,
+  },
+  dailyTitle: {
+    fontFamily: FontFamily.displaySemiBold,
+    fontSize: 15,
+    color: Colors.text,
+  },
+  dailyDescription: {
+    fontFamily: FontFamily.body,
+    fontSize: 11,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+
+  /* HUD Metrics Card */
+  hudMetricsContainer: {
+    backgroundColor: Colors.bgElevated,
+    borderRadius: Radius.lg,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 16,
+  },
+  hudProgressionCard: {
+    gap: 8,
+  },
+  hudProgressionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  hudLevelTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  hudLevelText: {
+    fontFamily: FontFamily.monoBold,
+    fontSize: 12,
+    color: Colors.accent,
+  },
+  hudXpFraction: {
+    fontFamily: FontFamily.mono,
+    fontSize: 11,
+    color: Colors.textMuted,
+  },
+  xpTrack: {
+    height: 6,
+    backgroundColor: Colors.surface,
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  xpFill: {
+    height: "100%",
+    backgroundColor: Colors.accent,
+    borderRadius: 3,
+  },
+  statsStripGrid: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: 16,
+    paddingBottom: 4,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  statStripItem: {
+    alignItems: "center",
+    flex: 1,
+    gap: 3,
+  },
+  statStripVal: {
+    fontFamily: FontFamily.display,
+    fontSize: 15,
+    color: Colors.text,
+  },
+  statStripLabel: {
+    fontFamily: FontFamily.body,
     fontSize: 10,
-    letterSpacing: 1.5,
-    marginBottom: 8,
+    color: Colors.textDim,
+  },
+
+  /* Section Blocks */
+  sectionBlock: {
+    gap: 10,
+    marginTop: 4,
+  },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
     paddingLeft: 2,
   },
-  statsGrid: {
+  sectionHeading: {
+    fontFamily: FontFamily.monoBold,
+    fontSize: 11,
+    color: Colors.textMuted,
+    letterSpacing: 1.4,
+  },
+
+  /* Grid 2 Column (Competitive Arena) */
+  grid2Col: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
   },
-  navRow: {
-    gap: 10,
-    marginTop: 4,
+  featureTile: {
+    width: "48.5%",
+    borderRadius: Radius.md,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
   },
-  navCard: {
+  featureTileGradient: {
+    padding: 12,
+    minHeight: 96,
+    justifyContent: "space-between",
+  },
+  featureTileTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  tileIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius.xs,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  liveBadge: {
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    borderRadius: Radius.full,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  liveBadgeText: {
+    fontFamily: FontFamily.monoBold,
+    fontSize: 8,
+    color: Colors.primary,
+    letterSpacing: 0.5,
+  },
+  tileTitle: {
+    fontFamily: FontFamily.displaySemiBold,
+    fontSize: 13,
+    color: Colors.text,
+    marginTop: 8,
+  },
+  tileSub: {
+    fontFamily: FontFamily.body,
+    fontSize: 10,
+    color: Colors.textDim,
+    marginTop: 1,
+  },
+
+  /* Row Cards (Tactical Lab & Training) */
+  rowCardsContainer: {
+    gap: 8,
+  },
+  horizontalNavRow: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
     paddingVertical: 12,
     paddingHorizontal: 14,
+    borderRadius: Radius.md,
     borderWidth: 1,
     borderColor: Colors.border,
     gap: 12,
   },
-  navCardPressed: {
-    backgroundColor: Colors.surfaceSoft,
-    borderColor: Colors.borderStrong,
-  },
-  navIconContainer: {
+  rowIconCircle: {
     width: 38,
     height: 38,
     borderRadius: Radius.sm,
-    backgroundColor: "rgba(0, 210, 180, 0.12)",
     alignItems: "center",
     justifyContent: "center",
   },
-  navTextContainer: {
+  rowTextWrap: {
     flex: 1,
   },
-  navLabel: {
-    fontFamily: FontFamily.bodyBold,
-    color: Colors.text,
-    fontSize: 14,
-  },
-  navMeta: {
-    fontFamily: FontFamily.body,
-    color: Colors.textMuted,
-    fontSize: 12,
-    marginTop: 1,
-  },
-  levelBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: Colors.surface,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: "rgba(255, 184, 0, 0.25)",
-    marginBottom: 6,
-  },
-  levelBannerPressed: {
-    backgroundColor: Colors.surfaceSoft,
-    borderColor: Colors.accent,
-  },
-  levelBannerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    flex: 1,
-  },
-  levelBadge: {
-    backgroundColor: "rgba(255, 184, 0, 0.18)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: Radius.sm,
-    borderWidth: 1,
-    borderColor: "rgba(255, 184, 0, 0.35)",
-  },
-  levelBadgeText: {
-    fontFamily: FontFamily.mono,
-    fontSize: 12,
-    fontWeight: "700",
-    color: Colors.accent,
-  },
-  levelTitleWrap: {
-    flex: 1,
-    paddingRight: 8,
-  },
-  levelRankTitle: {
+  rowTitle: {
     fontFamily: FontFamily.sansBold,
     fontSize: 13,
     color: Colors.text,
   },
-  levelXpRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 3,
-  },
-  miniXpTrack: {
-    flex: 1,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
-    overflow: "hidden",
-  },
-  miniXpFill: {
-    height: "100%",
-    backgroundColor: Colors.accent,
-    borderRadius: 2,
-  },
-  miniXpText: {
-    fontFamily: FontFamily.mono,
-    fontSize: 9,
+  rowSub: {
+    fontFamily: FontFamily.sans,
+    fontSize: 11,
     color: Colors.textMuted,
-  },
-  rankPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: Radius.full,
-    borderWidth: 1,
-  },
-  rankPillText: {
-    fontFamily: FontFamily.mono,
-    fontSize: 10,
-    fontWeight: "700",
-  },
-  profileIconBtn: {
-    borderWidth: 0,
-    backgroundColor: "transparent",
-  },
-  rowReverse: {
-    flexDirection: "row-reverse",
+    marginTop: 2,
   },
 });

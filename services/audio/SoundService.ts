@@ -1,4 +1,4 @@
-import { Audio } from "expo-av";
+import { createAudioPlayer, setAudioModeAsync } from "expo-audio";
 import { Platform } from "react-native";
 
 export type SoundEffect =
@@ -33,11 +33,11 @@ class SoundServiceImpl {
         // Web audio context not available
       }
     } else {
-      // Configure audio mode for native
-      Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: true,
+      // Configure audio mode for native via expo-audio
+      setAudioModeAsync({
+        playsInSilentMode: true,
+        shouldPlayInBackground: false,
+        interruptionMode: "duckOthers",
       }).catch(() => {});
     }
   }
@@ -62,7 +62,7 @@ class SoundServiceImpl {
       return;
     }
 
-    // Native fallback via expo-av
+    // Native playback via expo-audio
     try {
       await this.playNativeTone(effect);
     } catch {
@@ -238,20 +238,22 @@ class SoundServiceImpl {
   }
 
   private async playNativeTone(effect: SoundEffect): Promise<void> {
-    // Generate an in-memory data URI sound for native expo-av
+    // Generate an in-memory data URI sound for native expo-audio
     const uri = this.generateToneWavUri(effect);
     if (!uri) return;
 
     try {
-      const { sound } = await Audio.Sound.createAsync(
-        { uri },
-        { volume: this.volume, shouldPlay: true },
-      );
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && status.didJustFinish) {
-          sound.unloadAsync().catch(() => {});
+      const player = createAudioPlayer({ uri });
+      player.volume = this.volume;
+
+      const subscription = player.addListener("playbackStatusUpdate", (status) => {
+        if (status.didJustFinish) {
+          subscription.remove();
+          player.remove();
         }
       });
+
+      player.play();
     } catch {
       // Fallback
     }

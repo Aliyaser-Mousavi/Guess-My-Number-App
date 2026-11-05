@@ -37,7 +37,7 @@ type Props = {
 
 export default function LeaderboardScreen({ onBack }: Props) {
   const { user } = useAuth();
-  const { buzz, playSound, isRTL } = useGame();
+  const { buzz, playSound } = useGame();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -124,10 +124,10 @@ export default function LeaderboardScreen({ onBack }: Props) {
         style={[
           styles.entryCard,
           isCurrentUser && styles.currentUserCard,
-          isRTL && styles.rowReverse,
+          
         ]}
       >
-        <View style={[styles.leftWrap, isRTL && styles.rowReverse]}>
+        <View style={styles.leftWrap}>
           {renderRankBadge(item.globalRank)}
           <View style={styles.avatarWrap}>
             <Ionicons name="person-circle" size={32} color={tierMeta.color} />
@@ -136,7 +136,7 @@ export default function LeaderboardScreen({ onBack }: Props) {
             <Text style={[styles.playerName, isCurrentUser && styles.currentUserName]} numberOfLines={1}>
               {item.displayName || item.username}
             </Text>
-            <View style={[styles.tierRow, isRTL && styles.rowReverse]}>
+            <View style={styles.tierRow}>
               <Text style={[styles.tierLabel, { color: tierMeta.color }]}>
                 {tierMeta.label} {item.division}
               </Text>
@@ -159,7 +159,7 @@ export default function LeaderboardScreen({ onBack }: Props) {
     <ScreenBackground>
       <SafeAreaView style={styles.safe}>
         {/* Header */}
-        <View style={[styles.header, isRTL && styles.rowReverse]}>
+        <View style={styles.header}>
           <PrimaryButton
             variant="ghost"
             size="sm"
@@ -218,8 +218,8 @@ export default function LeaderboardScreen({ onBack }: Props) {
 
         {/* Pinned User Standing Bar */}
         {userStanding && (
-          <View style={[styles.pinnedBar, isRTL && styles.rowReverse]}>
-            <View style={[styles.pinnedLeft, isRTL && styles.rowReverse]}>
+          <View style={styles.pinnedBar}>
+            <View style={styles.pinnedLeft}>
               <View style={styles.pinnedRankBadge}>
                 <Text style={styles.pinnedRankText}>#{userStanding.globalRank}</Text>
               </View>
@@ -255,10 +255,7 @@ const styles = StyleSheet.create({
   titleWrap: {
     alignItems: "center",
   },
-  rowReverse: {
-    flexDirection: "row-reverse",
-  },
-  subHeader: {
+    subHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",

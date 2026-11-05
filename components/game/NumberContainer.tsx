@@ -1,7 +1,6 @@
 import Colors from "@/constants/colors";
 import { FontFamily, Radius } from "@/constants/theme";
 import { useGame } from "@/context/GameProvider";
-import { LocalizationService } from "@/services/localization/LocalizationService";
 import type { NumberDisplayStyle } from "@/types/game";
 import React, { useEffect } from "react";
 import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
@@ -29,7 +28,6 @@ export default function NumberContainer({
 
   let styleMode: NumberDisplayStyle = "arcade_glow";
   let animMode = "pulse";
-  let digitFormat: "latin" | "persian" = "latin";
   let reducedMotion = false;
 
   try {
@@ -37,7 +35,6 @@ export default function NumberContainer({
     if (game?.settings) {
       styleMode = game.settings.numberStyle ?? "arcade_glow";
       animMode = game.settings.numberAnimation ?? "pulse";
-      digitFormat = game.settings.digitFormat ?? "latin";
       reducedMotion = game.settings.reducedMotion ?? false;
     }
   } catch {
@@ -77,7 +74,7 @@ export default function NumberContainer({
     opacity: opacity.value,
   }));
 
-  const formattedValue = LocalizationService.formatNumber(children, digitFormat);
+  const formattedValue = children != null ? String(children) : "";
 
   // Style decorators
   let displayedText = formattedValue;

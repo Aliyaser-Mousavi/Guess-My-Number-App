@@ -8,13 +8,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "@/lib/supabase";
 import type {
-  AcademyLesson,
   AcademyMasteryRank,
   AcademyModule,
   AcademyProgressState,
   DailyBrainPuzzle,
   GuessEvaluation,
-  GuessOptimality,
   PracticeChallenge,
 } from "@/types/academy";
 

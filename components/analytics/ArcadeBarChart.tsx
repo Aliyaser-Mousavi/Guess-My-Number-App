@@ -1,6 +1,5 @@
 import Colors from "@/constants/colors";
 import { FontFamily, Radius } from "@/constants/theme";
-import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 export type BarChartItem = {
@@ -44,10 +43,12 @@ export default function ArcadeBarChart({
         <View style={styles.barsRow}>
           {data.map((item, idx) => {
             const ratio = maxValue > 0 ? item.value / maxValue : 0;
-            const barHeight = Math.max(ratio * (height - 36), item.value > 0 ? 6 : 2);
+            const barHeight = Math.max(
+              ratio * (height - 36),
+              item.value > 0 ? 6 : 2,
+            );
             const barColor =
-              item.color ??
-              (item.highlight ? Colors.accent : Colors.primary);
+              item.color ?? (item.highlight ? Colors.accent : Colors.primary);
 
             return (
               <View key={`${item.label}-${idx}`} style={styles.barColumn}>
@@ -171,4 +172,3 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
   },
 });
-

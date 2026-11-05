@@ -38,7 +38,7 @@ export default function AuthModal({
     isRecoveryMode,
     clearRecoveryMode,
   } = useAuth();
-  const { profile, buzz, playSound, isRTL } = useGame();
+  const { profile, buzz, playSound } = useGame();
 
   const [activeTab, setActiveTab] = useState<Mode | null>(null);
   const mode: Mode = isRecoveryMode ? "update_password" : (activeTab ?? initialMode);
@@ -185,8 +185,8 @@ export default function AuthModal({
         <SafeAreaView style={styles.safe}>
           <View style={styles.modalBox}>
             {/* Header */}
-            <View style={[styles.headerRow, isRTL && styles.rowReverse]}>
-              <View style={[styles.titleIconRow, isRTL && styles.rowReverse]}>
+            <View style={styles.headerRow}>
+              <View style={styles.titleIconRow}>
                 <Ionicons
                   name={
                     mode === "register"
@@ -228,7 +228,7 @@ export default function AuthModal({
             >
               {/* Tab Selector (for login vs register) */}
               {(mode === "login" || mode === "register") && (
-                <View style={[styles.tabSelector, isRTL && styles.rowReverse]}>
+                <View style={styles.tabSelector}>
                   <Pressable
                     onPress={() => switchMode("login")}
                     style={[
@@ -481,10 +481,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  rowReverse: {
-    flexDirection: "row-reverse",
-  },
-  titleIconRow: {
+    titleIconRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,

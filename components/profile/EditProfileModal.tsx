@@ -34,7 +34,6 @@ export default function EditProfileModal({ visible, onClose }: Props) {
     cosmetics,
     buzz,
     playSound,
-    t,
   } = useGame();
 
   const [name, setName] = useState(profile.displayName);
@@ -107,7 +106,7 @@ export default function EditProfileModal({ visible, onClose }: Props) {
           <View style={styles.sheet}>
             {/* Header */}
             <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>{t("edit_profile")}</Text>
+              <Text style={styles.sheetTitle}>Edit Profile</Text>
               <Pressable
                 onPress={onClose}
                 accessibilityRole="button"
@@ -127,14 +126,14 @@ export default function EditProfileModal({ visible, onClose }: Props) {
             >
               {/* Display Name Input */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>{t("display_name")}</Text>
+                <Text style={styles.label}>Display Name</Text>
                 <TextInput
                   value={name}
                   onChangeText={(val) => {
                     setName(val);
                     if (errorMsg) setErrorMsg("");
                   }}
-                  placeholder={t("enter_name")}
+                  placeholder="Enter your display name"
                   placeholderTextColor={Colors.textDim}
                   style={styles.textInput}
                   maxLength={20}
@@ -147,7 +146,7 @@ export default function EditProfileModal({ visible, onClose }: Props) {
 
               {/* Avatar Selection Grid */}
               <View style={styles.sectionWrap}>
-                <Text style={styles.label}>{t("avatar_select")}</Text>
+                <Text style={styles.label}>Choose Your Avatar</Text>
                 <View style={styles.avatarGrid}>
                   {AVATAR_CATALOG.map((avatar) => {
                     const unlocked = isAvatarUnlocked(avatar);
@@ -193,7 +192,7 @@ export default function EditProfileModal({ visible, onClose }: Props) {
               {/* Showcase Badges Selection */}
               <View style={styles.sectionWrap}>
                 <View style={styles.sectionHeaderRow}>
-                  <Text style={styles.label}>{t("showcase")}</Text>
+                  <Text style={styles.label}>Showcase Badges</Text>
                   <Text style={styles.counterText}>
                     {selectedShowcase.length} / 3 Selected
                   </Text>
@@ -275,7 +274,7 @@ export default function EditProfileModal({ visible, onClose }: Props) {
                     size="md"
                     onPress={onClose}
                   >
-                    {t("cancel")}
+                    Cancel
                   </PrimaryButton>
                 </View>
                 <View style={{ flex: 1 }}>
@@ -284,7 +283,7 @@ export default function EditProfileModal({ visible, onClose }: Props) {
                     size="md"
                     onPress={handleSave}
                   >
-                    {t("save_profile")}
+                    Save Profile
                   </PrimaryButton>
                 </View>
               </View>

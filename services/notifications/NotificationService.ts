@@ -6,7 +6,6 @@ import { Platform } from "react-native";
 try {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
-      shouldShowAlert: true,
       shouldPlaySound: true,
       shouldSetBadge: false,
       shouldShowBanner: true,
@@ -77,7 +76,7 @@ export class NotificationService {
 
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: "🎯 Guess My Number",
+          title: "🎯 MarsGuess",
           body: "Arcade notification system is active and ready for your daily challenges!",
           data: { type: "test" },
         },

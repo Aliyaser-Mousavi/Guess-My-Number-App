@@ -1,13 +1,12 @@
 import Colors from "@/constants/colors";
 import { FontFamily, Radius } from "@/constants/theme";
-import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Svg, {
+  Circle,
   Defs,
   LinearGradient,
   Path,
   Stop,
-  Circle,
 } from "react-native-svg";
 
 export type TrendPoint = {
@@ -151,4 +150,3 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
   },
 });
-

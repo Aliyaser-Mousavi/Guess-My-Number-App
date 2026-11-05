@@ -1,24 +1,30 @@
+// ==============================================================================
+// Screen: SettingsScreen.tsx
+// Description: Modernized settings and configuration hub for MarsGuess.
+//              Features sleek glassmorphism category cards, visual themes,
+//              number styles, accessibility options, push notifications,
+//              audio & haptic tuning, and a redesigned high-craft danger zone.
+// ==============================================================================
+
 import InteractiveTutorialModal from "@/components/tutorial/InteractiveTutorialModal";
 import PrimaryButton from "@/components/ui/PrimaryButton";
 import ScreenBackground from "@/components/ui/ScreenBackground";
 import Title from "@/components/ui/Title";
 import Colors from "@/constants/colors";
-import { FontFamily, Radius } from "@/constants/theme";
+import { FontFamily, Radius, Shadows, Spacing } from "@/constants/theme";
 import { useAppAlert } from "@/context/AlertProvider";
 import { useGame } from "@/context/GameProvider";
-import { LocalizationService } from "@/services/localization/LocalizationService";
 import { NotificationService } from "@/services/notifications/NotificationService";
 import { THEME_CATALOG, ThemeService } from "@/services/theme/ThemeService";
 import type {
   ColorBlindOption,
-  DigitFormatOption,
   HapticIntensity,
-  LanguageOption,
   NumberAnimationOption,
   NumberDisplayStyle,
   TextSizeOption,
 } from "@/types/game";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useState } from "react";
 import {
   Pressable,
@@ -30,7 +36,13 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-export default function SettingsScreen({ onBack }: { onBack: () => void }) {
+export default function SettingsScreen({
+  onBack,
+  onOpenAboutDeveloper,
+}: {
+  onBack: () => void;
+  onOpenAboutDeveloper?: () => void;
+}) {
   const {
     settings,
     updateSettings,
@@ -39,8 +51,6 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
     competitiveRank,
     buzz,
     playSound,
-    t,
-    isRTL,
     formatNumber,
   } = useGame();
   const { showAlert } = useAppAlert();
@@ -54,7 +64,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
       "Reset All Progress?",
       "Lifetime statistics, win streaks, and earned badges will be permanently erased. This action cannot be reversed.",
       [
-        { text: t("cancel"), style: "cancel" },
+        { text: "Cancel", style: "cancel" },
         {
           text: "Reset Everything",
           style: "destructive",
@@ -67,7 +77,10 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
     );
   }
 
-  async function handleToggleNotification(key: keyof typeof settings.notifications, val: boolean) {
+  async function handleToggleNotification(
+    key: keyof typeof settings.notifications,
+    val: boolean,
+  ) {
     buzz("light");
     if (val) {
       const granted = await NotificationService.requestPermissions();
@@ -104,307 +117,279 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <ScreenBackground>
-      <SafeAreaView style={styles.safe}>
+      <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+        {/* Navigation Header */}
+        <View style={styles.headerBar}>
+          <Pressable
+            onPress={() => {
+              buzz("light");
+              playSound("button_click");
+              onBack();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            style={({ pressed }) => [
+              styles.backButton,
+              pressed && styles.buttonPressed,
+            ]}
+          >
+            <Ionicons name="arrow-back" size={20} color={Colors.text} />
+          </Pressable>
+
+          <View style={styles.headerTitleWrap}>
+            <Title size="md">Settings</Title>
+            <Text style={styles.headerSubtitle}>System & Preferences</Text>
+          </View>
+
+          <View style={styles.headerSpacer} />
+        </View>
+
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Header Row */}
-          <View style={[styles.headerRow, isRTL && styles.rowReverse]}>
-            <Pressable
-              onPress={() => {
-                buzz("light");
-                playSound("button_click");
-                onBack();
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Go back"
-              style={({ pressed }) => [
-                styles.backBtn,
-                pressed && styles.backBtnPressed,
-              ]}
-            >
-              <Ionicons
-                name={LocalizationService.getArrowBack(settings.language)}
-                size={20}
-                color={Colors.text}
-              />
-            </Pressable>
-            <View style={styles.titleWrap}>
-              <Title size="lg">{t("settings")}</Title>
+          {/* Section 1: Themes & Appearance */}
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.sectionIconPill}>
+                <Ionicons name="color-palette-outline" size={16} color={Colors.primary} />
+              </View>
+              <View style={styles.flex1}>
+                <Text style={styles.sectionHeading}>VISUAL THEMES</Text>
+                <Text style={styles.sectionSubtext}>
+                  Select your tactical radar color palette
+                </Text>
+              </View>
             </View>
-            <View style={{ width: 42 }} />
-          </View>
 
-          {/* 1. Themes & Appearance */}
-          <Text style={[styles.sectionHeader, isRTL && styles.textRight]}>
-            {t("themes_title").toUpperCase()}
-          </Text>
-          <View style={styles.themesGrid}>
-            {THEME_CATALOG.map((theme) => {
-              const unlocked = ThemeService.isThemeUnlocked(
-                theme,
-                progression.level,
-                competitiveRank.tier,
-              );
-              const isSelected = settings.themeId === theme.id;
+            <View style={styles.themesGrid}>
+              {THEME_CATALOG.map((theme) => {
+                const unlocked = ThemeService.isThemeUnlocked(
+                  theme,
+                  progression.level,
+                  competitiveRank.tier,
+                );
+                const isSelected = settings.themeId === theme.id;
 
-              return (
-                <Pressable
-                  key={theme.id}
-                  onPress={() => {
-                    if (unlocked) {
-                      buzz("light");
-                      playSound("button_click");
-                      updateSettings({ themeId: theme.id });
-                    } else {
-                      buzz("error");
-                    }
-                  }}
-                  style={[
-                    styles.themeCard,
-                    { borderColor: isSelected ? theme.colors.accent : Colors.border },
-                    !unlocked && styles.themeCardLocked,
-                  ]}
-                >
-                  {/* Theme Gradient Preview Swatch */}
-                  <View
-                    style={[
-                      styles.themeSwatch,
-                      { backgroundColor: theme.colors.bgElevated, borderColor: theme.colors.primary },
+                return (
+                  <Pressable
+                    key={theme.id}
+                    onPress={() => {
+                      if (unlocked) {
+                        buzz("light");
+                        playSound("button_click");
+                        updateSettings({ themeId: theme.id });
+                      } else {
+                        buzz("error");
+                      }
+                    }}
+                    style={({ pressed }) => [
+                      styles.themeCard,
+                      {
+                        borderColor: isSelected
+                          ? theme.colors.accent
+                          : Colors.border,
+                      },
+                      isSelected && styles.themeCardSelected,
+                      !unlocked && styles.themeCardLocked,
+                      pressed && unlocked && styles.themeCardPressed,
                     ]}
                   >
+                    {/* Theme Swatch */}
                     <View
                       style={[
-                        styles.themeSwatchDot,
-                        { backgroundColor: theme.colors.primary },
+                        styles.themeSwatch,
+                        {
+                          backgroundColor: theme.colors.bgElevated,
+                          borderColor: theme.colors.primary,
+                        },
                       ]}
-                    />
-                    <View
-                      style={[
-                        styles.themeSwatchDot,
-                        { backgroundColor: theme.colors.accent },
-                      ]}
-                    />
-                    <View
-                      style={[
-                        styles.themeSwatchDot,
-                        { backgroundColor: theme.colors.coral },
-                      ]}
-                    />
-                  </View>
-
-                  <View style={styles.themeInfo}>
-                    <Text style={styles.themeName}>{theme.name}</Text>
-                    <Text style={styles.themeTagline} numberOfLines={1}>
-                      {unlocked
-                        ? isSelected
-                          ? t("active_theme")
-                          : theme.tagline
-                        : theme.requiredLevel
-                        ? `Unlocks at Lv. ${formatNumber(theme.requiredLevel)}`
-                        : "Unlocked in higher rank"}
-                    </Text>
-                  </View>
-
-                  {isSelected && (
-                    <View style={styles.equippedCheck}>
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={18}
-                        color={theme.colors.accent}
+                    >
+                      <View
+                        style={[
+                          styles.themeSwatchDot,
+                          { backgroundColor: theme.colors.primary },
+                        ]}
+                      />
+                      <View
+                        style={[
+                          styles.themeSwatchDot,
+                          { backgroundColor: theme.colors.accent },
+                        ]}
+                      />
+                      <View
+                        style={[
+                          styles.themeSwatchDot,
+                          { backgroundColor: theme.colors.coral },
+                        ]}
                       />
                     </View>
-                  )}
-                  {!unlocked && (
-                    <View style={styles.lockBadge}>
-                      <Ionicons name="lock-closed" size={14} color={Colors.textMuted} />
+
+                    <View style={styles.themeInfo}>
+                      <View style={styles.themeTitleRow}>
+                        <Text style={styles.themeName}>{theme.name}</Text>
+                        {isSelected && (
+                          <View
+                            style={[
+                              styles.themeStatusBadge,
+                              { backgroundColor: `${theme.colors.accent}20` },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.themeStatusBadgeText,
+                                { color: theme.colors.accent },
+                              ]}
+                            >
+                              EQUIPPED
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={styles.themeTagline} numberOfLines={1}>
+                        {unlocked
+                          ? theme.tagline
+                          : theme.requiredLevel
+                          ? `Unlocks at Lv. ${formatNumber(theme.requiredLevel)}`
+                          : "Unlocked in higher rank"}
+                      </Text>
                     </View>
-                  )}
-                </Pressable>
-              );
-            })}
-          </View>
 
-          {/* 2. Number Appearance & Animations */}
-          <Text style={[styles.sectionHeader, isRTL && styles.textRight]}>
-            {t("number_styles_title").toUpperCase()}
-          </Text>
-          <View style={styles.sectionGroup}>
-            <View style={styles.optionList}>
-              {[
-                { id: "arcade_glow", label: t("style_arcade_glow") },
-                { id: "holographic_glass", label: t("style_holographic_glass") },
-                { id: "retro_pixel", label: t("style_retro_pixel") },
-                { id: "minimal_clean", label: t("style_minimal_clean") },
-                { id: "cyber_matrix", label: t("style_cyber_matrix") },
-              ].map((styleOpt) => {
-                const isSelected = settings.numberStyle === styleOpt.id;
-                return (
-                  <Pressable
-                    key={styleOpt.id}
-                    onPress={() => {
-                      buzz("light");
-                      playSound("button_click");
-                      updateSettings({
-                        numberStyle: styleOpt.id as NumberDisplayStyle,
-                      });
-                    }}
-                    style={[
-                      styles.choiceRow,
-                      isSelected && styles.choiceRowSelected,
-                      isRTL && styles.rowReverse,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.choiceLabel,
-                        isSelected && { color: Colors.accent },
-                      ]}
-                    >
-                      {styleOpt.label}
-                    </Text>
-                    <Ionicons
-                      name={isSelected ? "radio-button-on" : "radio-button-off"}
-                      size={18}
-                      color={isSelected ? Colors.accent : Colors.textDim}
-                    />
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            <View style={styles.subDivider} />
-            <Text style={[styles.subOptionLabel, isRTL && styles.textRight]}>
-              {t("number_animations_title").toUpperCase()}
-            </Text>
-            <View style={styles.pillsRow}>
-              {[
-                { id: "pulse", label: "Pulse" },
-                { id: "flicker", label: "Flicker" },
-                { id: "bounce", label: "Bounce" },
-                { id: "none", label: "None" },
-              ].map((anim) => {
-                const isSelected = settings.numberAnimation === anim.id;
-                return (
-                  <Pressable
-                    key={anim.id}
-                    onPress={() => {
-                      buzz("light");
-                      updateSettings({
-                        numberAnimation: anim.id as NumberAnimationOption,
-                      });
-                    }}
-                    style={[
-                      styles.intensityPill,
-                      isSelected && styles.intensityPillActive,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.intensityPillText,
-                        isSelected && styles.intensityPillTextActive,
-                      ]}
-                    >
-                      {anim.label}
-                    </Text>
+                    {isSelected && (
+                      <View style={styles.themeCheckWrap}>
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={20}
+                          color={theme.colors.accent}
+                        />
+                      </View>
+                    )}
+                    {!unlocked && (
+                      <View style={styles.lockBadge}>
+                        <Ionicons
+                          name="lock-closed"
+                          size={15}
+                          color={Colors.textMuted}
+                        />
+                      </View>
+                    )}
                   </Pressable>
                 );
               })}
             </View>
           </View>
 
-          {/* 3. Language & Format */}
-          <Text style={[styles.sectionHeader, isRTL && styles.textRight]}>
-            {t("language_title").toUpperCase()}
-          </Text>
-          <View style={styles.sectionGroup}>
-            <View
-              style={[
-                styles.settingRow,
-                isRTL && styles.rowReverse,
-              ]}
-            >
-              <View style={[styles.settingRowLeft, isRTL && styles.rowReverse]}>
-                <Ionicons name="globe-outline" size={20} color={Colors.primary} />
-                <View>
-                  <Text style={styles.rowTitle}>{t("language_label")}</Text>
-                  <Text style={styles.rowSub}>English or فارسی (Full RTL)</Text>
-                </View>
+          {/* Section 2: Number Appearance & Animations */}
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.sectionIconPill}>
+                <Ionicons name="sparkles-outline" size={16} color={Colors.accent} />
               </View>
-              <View style={styles.pillsRow}>
+              <View style={styles.flex1}>
+                <Text style={styles.sectionHeading}>NUMBER APPEARANCE</Text>
+                <Text style={styles.sectionSubtext}>
+                  Display styles and dynamic guessing animations
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.sectionCard}>
+              <Text style={styles.subOptionHeader}>STYLE VARIANT</Text>
+              <View style={styles.optionList}>
                 {[
-                  { id: "en", label: "EN" },
-                  { id: "fa", label: "فارسی" },
-                ].map((lang) => {
-                  const isSelected = settings.language === lang.id;
+                  { id: "arcade_glow", label: "Arcade Glow", desc: "Cyan neon halo with neon vibrancy" },
+                  { id: "holographic_glass", label: "Holographic Glass", desc: "Frosted translucent glass overlay" },
+                  { id: "retro_pixel", label: "Retro Pixel", desc: "Classic 8-bit arcade aesthetic" },
+                  { id: "minimal_clean", label: "Minimal Clean", desc: "Crisp typography with zero distractions" },
+                  { id: "cyber_matrix", label: "Cyber Matrix", desc: "Tactical telemetry HUD phosphor" },
+                ].map((styleOpt) => {
+                  const isSelected = settings.numberStyle === styleOpt.id;
                   return (
                     <Pressable
-                      key={lang.id}
+                      key={styleOpt.id}
                       onPress={() => {
                         buzz("light");
                         playSound("button_click");
-                        updateSettings({ language: lang.id as LanguageOption });
+                        updateSettings({
+                          numberStyle: styleOpt.id as NumberDisplayStyle,
+                        });
                       }}
-                      style={[
-                        styles.intensityPill,
-                        isSelected && styles.intensityPillActive,
+                      style={({ pressed }) => [
+                        styles.choiceCard,
+                        isSelected && styles.choiceCardSelected,
+                        pressed && styles.choiceCardPressed,
                       ]}
                     >
-                      <Text
-                        style={[
-                          styles.intensityPillText,
-                          isSelected && styles.intensityPillTextActive,
-                        ]}
-                      >
-                        {lang.label}
-                      </Text>
+                      <View style={styles.choiceLeft}>
+                        <View
+                          style={[
+                            styles.choiceRadioOuter,
+                            isSelected && styles.choiceRadioOuterActive,
+                          ]}
+                        >
+                          {isSelected && <View style={styles.choiceRadioInner} />}
+                        </View>
+                        <View style={styles.choiceTextWrap}>
+                          <Text
+                            style={[
+                              styles.choiceLabel,
+                              isSelected && { color: Colors.accent },
+                            ]}
+                          >
+                            {styleOpt.label}
+                          </Text>
+                          <Text style={styles.choiceDesc}>{styleOpt.desc}</Text>
+                        </View>
+                      </View>
+                      <Ionicons
+                        name="chevron-forward"
+                        size={15}
+                        color={isSelected ? Colors.accent : Colors.textDim}
+                      />
                     </Pressable>
                   );
                 })}
               </View>
-            </View>
 
-            <View style={styles.subDivider} />
+              <View style={styles.subDivider} />
 
-            <View
-              style={[
-                styles.settingRow,
-                isRTL && styles.rowReverse,
-              ]}
-            >
-              <View style={[styles.settingRowLeft, isRTL && styles.rowReverse]}>
-                <Ionicons name="keypad-outline" size={20} color={Colors.accent} />
-                <View>
-                  <Text style={styles.rowTitle}>{t("digits_label")}</Text>
-                  <Text style={styles.rowSub}>1 2 3 vs ۱ ۲ ۳</Text>
-                </View>
-              </View>
+              <Text style={styles.subOptionHeader}>NUMBER ANIMATION</Text>
               <View style={styles.pillsRow}>
                 {[
-                  { id: "latin", label: "123" },
-                  { id: "persian", label: "۱۲۳" },
-                ].map((dig) => {
-                  const isSelected = settings.digitFormat === dig.id;
+                  { id: "pulse", label: "Pulse", icon: "pulse-outline" },
+                  { id: "flicker", label: "Flicker", icon: "flash-outline" },
+                  { id: "bounce", label: "Bounce", icon: "arrow-up-outline" },
+                  { id: "none", label: "None", icon: "close-outline" },
+                ].map((anim) => {
+                  const isSelected = settings.numberAnimation === anim.id;
                   return (
                     <Pressable
-                      key={dig.id}
+                      key={anim.id}
                       onPress={() => {
                         buzz("light");
-                        updateSettings({ digitFormat: dig.id as DigitFormatOption });
+                        playSound("button_click");
+                        updateSettings({
+                          numberAnimation: anim.id as NumberAnimationOption,
+                        });
                       }}
-                      style={[
+                      style={({ pressed }) => [
                         styles.intensityPill,
                         isSelected && styles.intensityPillActive,
+                        pressed && styles.buttonPressed,
                       ]}
                     >
+                      <Ionicons
+                        name={anim.icon as any}
+                        size={13}
+                        color={isSelected ? Colors.accent : Colors.textMuted}
+                      />
                       <Text
                         style={[
                           styles.intensityPillText,
                           isSelected && styles.intensityPillTextActive,
                         ]}
                       >
-                        {dig.label}
+                        {anim.label}
                       </Text>
                     </Pressable>
                   );
@@ -413,21 +398,27 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
             </View>
           </View>
 
-          {/* 4. Accessibility Options */}
-          <Text style={[styles.sectionHeader, isRTL && styles.textRight]}>
-            {t("accessibility_title").toUpperCase()}
-          </Text>
-          <View style={styles.sectionGroup}>
-            {/* Text Scaling */}
-            <View style={styles.accessibilitySubBlock}>
-              <Text style={[styles.subOptionLabel, isRTL && styles.textRight]}>
-                {t("text_size").toUpperCase()}
-              </Text>
+          {/* Section 3: Accessibility Options */}
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.sectionIconPill}>
+                <Ionicons name="accessibility-outline" size={16} color={Colors.mint} />
+              </View>
+              <View style={styles.flex1}>
+                <Text style={styles.sectionHeading}>ACCESSIBILITY OPTIONS</Text>
+                <Text style={styles.sectionSubtext}>
+                  Visual, motion, and ergonomic assistance
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.sectionCard}>
+              <Text style={styles.subOptionHeader}>TEXT SCALING</Text>
               <View style={styles.pillsRow}>
                 {[
-                  { id: "normal", label: "Normal" },
-                  { id: "large", label: "Large" },
-                  { id: "extraLarge", label: "XL" },
+                  { id: "normal", label: "Standard", sub: "100%" },
+                  { id: "large", label: "Large", sub: "115%" },
+                  { id: "extraLarge", label: "XL", sub: "130%" },
                 ].map((sz) => {
                   const isSelected = settings.textSize === sz.id;
                   return (
@@ -435,11 +426,13 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
                       key={sz.id}
                       onPress={() => {
                         buzz("light");
+                        playSound("button_click");
                         updateSettings({ textSize: sz.id as TextSizeOption });
                       }}
-                      style={[
+                      style={({ pressed }) => [
                         styles.intensityPill,
                         isSelected && styles.intensityPillActive,
+                        pressed && styles.buttonPressed,
                       ]}
                     >
                       <Text
@@ -448,304 +441,431 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
                           isSelected && styles.intensityPillTextActive,
                         ]}
                       >
-                        {sz.label}
+                        {sz.label} ({sz.sub})
                       </Text>
                     </Pressable>
                   );
                 })}
               </View>
-            </View>
 
-            <ToggleRow
-              icon="contrast-outline"
-              label={t("high_contrast")}
-              description={t("high_contrast_desc")}
-              value={settings.highContrast}
-              isRTL={isRTL}
-              onChange={(v) => {
-                buzz("medium");
-                updateSettings({ highContrast: v });
-              }}
-            />
+              <View style={styles.subDivider} />
 
-            <ToggleRow
-              icon="sparkles-outline"
-              label={t("reduced_motion")}
-              description={t("reduced_motion_desc")}
-              value={settings.reducedMotion}
-              isRTL={isRTL}
-              onChange={(v) => {
-                buzz("light");
-                updateSettings({ reducedMotion: v });
-              }}
-            />
+              <ToggleRow
+                icon="contrast-outline"
+                label="High Contrast Mode"
+                description="Pure black backgrounds with maximum visibility borders"
+                value={settings.highContrast}
+                onChange={(v) => {
+                  buzz("medium");
+                  updateSettings({ highContrast: v });
+                }}
+              />
 
-            <ToggleRow
-              icon="hand-left-outline"
-              label={t("left_handed")}
-              description={t("left_handed_desc")}
-              value={settings.leftHandedControls}
-              isRTL={isRTL}
-              onChange={(v) => {
-                buzz("light");
-                updateSettings({ leftHandedControls: v });
-              }}
-            />
+              <ToggleRow
+                icon="speedometer-outline"
+                label="Reduced Motion"
+                description="Minimizes looping animations, scale springs, and particles"
+                value={settings.reducedMotion}
+                onChange={(v) => {
+                  buzz("light");
+                  updateSettings({ reducedMotion: v });
+                }}
+              />
 
-            <View style={styles.subDivider} />
-            <Text style={[styles.subOptionLabel, isRTL && styles.textRight]}>
-              {t("color_blind").toUpperCase()}
-            </Text>
-            <View style={styles.optionList}>
-              {[
-                { id: "none", label: t("cb_none") },
-                { id: "protanopia", label: t("cb_protanopia") },
-                { id: "deuteranopia", label: t("cb_deuteranopia") },
-                { id: "tritanopia", label: t("cb_tritanopia") },
-              ].map((cb) => {
-                const isSelected = settings.colorBlindMode === cb.id;
-                return (
-                  <Pressable
-                    key={cb.id}
-                    onPress={() => {
-                      buzz("light");
-                      updateSettings({
-                        colorBlindMode: cb.id as ColorBlindOption,
-                      });
-                    }}
-                    style={[
-                      styles.choiceRow,
-                      isSelected && styles.choiceRowSelected,
-                      isRTL && styles.rowReverse,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.choiceLabel,
-                        isSelected && { color: Colors.accent },
+              <ToggleRow
+                icon="hand-left-outline"
+                label="Left-Handed Layout"
+                description="Reverses action button alignments for single-handed left-thumb play"
+                value={settings.leftHandedControls}
+                onChange={(v) => {
+                  buzz("light");
+                  updateSettings({ leftHandedControls: v });
+                }}
+              />
+
+              <View style={styles.subDivider} />
+
+              <Text style={styles.subOptionHeader}>COLOR-BLIND PROTOCOL</Text>
+              <View style={styles.optionList}>
+                {[
+                  { id: "none", label: "Standard Colors", tag: "Default" },
+                  { id: "protanopia", label: "Protanopia Friendly", tag: "Red-Weak" },
+                  { id: "deuteranopia", label: "Deuteranopia Friendly", tag: "Green-Weak" },
+                  { id: "tritanopia", label: "Tritanopia Friendly", tag: "Blue-Weak" },
+                ].map((cb) => {
+                  const isSelected = settings.colorBlindMode === cb.id;
+                  return (
+                    <Pressable
+                      key={cb.id}
+                      onPress={() => {
+                        buzz("light");
+                        playSound("button_click");
+                        updateSettings({
+                          colorBlindMode: cb.id as ColorBlindOption,
+                        });
+                      }}
+                      style={({ pressed }) => [
+                        styles.choiceCard,
+                        isSelected && styles.choiceCardSelected,
+                        pressed && styles.choiceCardPressed,
                       ]}
                     >
-                      {cb.label}
-                    </Text>
-                    <Ionicons
-                      name={isSelected ? "radio-button-on" : "radio-button-off"}
-                      size={18}
-                      color={isSelected ? Colors.accent : Colors.textDim}
-                    />
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
-          {/* 5. Notification Reminders */}
-          <Text style={[styles.sectionHeader, isRTL && styles.textRight]}>
-            {t("notifications_title").toUpperCase()}
-          </Text>
-          <View style={styles.sectionGroup}>
-            <ToggleRow
-              icon="calendar-outline"
-              label={t("daily_reminder")}
-              description={t("daily_reminder_desc")}
-              value={settings.notifications.dailyReminder}
-              isRTL={isRTL}
-              onChange={(v) => handleToggleNotification("dailyReminder", v)}
-            />
-            <ToggleRow
-              icon="flame-outline"
-              label={t("streak_reminder")}
-              description={t("streak_reminder_desc")}
-              value={settings.notifications.streakReminder}
-              isRTL={isRTL}
-              onChange={(v) => handleToggleNotification("streakReminder", v)}
-            />
-            <ToggleRow
-              icon="alarm-outline"
-              label={t("mission_reminder")}
-              description={t("mission_reminder_desc")}
-              value={settings.notifications.missionReminder}
-              isRTL={isRTL}
-              onChange={(v) => handleToggleNotification("missionReminder", v)}
-            />
-            <ToggleRow
-              icon="megaphone-outline"
-              label={t("event_reminder")}
-              description={t("event_reminder_desc")}
-              value={settings.notifications.eventReminder}
-              isRTL={isRTL}
-              onChange={(v) => handleToggleNotification("eventReminder", v)}
-            />
-
-            <View style={styles.testNotifWrap}>
-              <PrimaryButton
-                variant="secondary"
-                size="sm"
-                onPress={handleSendTestNotification}
-                icon={<Ionicons name="notifications-outline" size={16} color={Colors.text} />}
-              >
-                {t("send_test_notif")}
-              </PrimaryButton>
-              {testNotifStatus ? (
-                <Text style={styles.testNotifText}>{testNotifStatus}</Text>
-              ) : null}
-            </View>
-          </View>
-
-          {/* 6. Audio & Sound Effects */}
-          <Text style={[styles.sectionHeader, isRTL && styles.textRight]}>
-            {t("audio_haptics_title").toUpperCase()}
-          </Text>
-          <View style={styles.sectionGroup}>
-            <ToggleRow
-              icon="volume-high-outline"
-              label={t("sound_effects")}
-              description="Audio cues for guesses, triumphs, and interactions"
-              value={settings.soundEnabled}
-              isRTL={isRTL}
-              onChange={(v) => {
-                buzz("light");
-                updateSettings({ soundEnabled: v });
-                if (v) playSound("button_click");
-              }}
-            />
-
-            {settings.soundEnabled && (
-              <View style={styles.volumeRow}>
-                <Text style={[styles.subOptionLabel, isRTL && styles.textRight]}>
-                  {t("sound_volume").toUpperCase()}
-                </Text>
-                <View style={styles.pillsRow}>
-                  {[
-                    { label: "Quiet", val: 0.3 },
-                    { label: "Balanced", val: 0.7 },
-                    { label: "Full", val: 1.0 },
-                  ].map((p) => {
-                    const isSelected = Math.abs(settings.soundVolume - p.val) < 0.15;
-                    return (
-                      <Pressable
-                        key={p.label}
-                        onPress={() => {
-                          buzz("light");
-                          updateSettings({ soundVolume: p.val });
-                          playSound("button_click");
-                        }}
-                        style={[
-                          styles.intensityPill,
-                          isSelected && styles.intensityPillActive,
-                        ]}
-                      >
+                      <View style={styles.choiceLeft}>
+                        <View
+                          style={[
+                            styles.choiceRadioOuter,
+                            isSelected && styles.choiceRadioOuterActive,
+                          ]}
+                        >
+                          {isSelected && <View style={styles.choiceRadioInner} />}
+                        </View>
                         <Text
                           style={[
-                            styles.intensityPillText,
-                            isSelected && styles.intensityPillTextActive,
+                            styles.choiceLabel,
+                            isSelected && { color: Colors.accent },
                           ]}
                         >
-                          {p.label}
+                          {cb.label}
                         </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                      </View>
+                      <View style={styles.tagPill}>
+                        <Text style={styles.tagPillText}>{cb.tag}</Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
               </View>
-            )}
+            </View>
+          </View>
 
-            <ToggleRow
-              icon="phone-portrait-outline"
-              label={t("vibration_haptics")}
-              description="Tactile pulses on buttons, range changes and alerts"
-              value={settings.haptics}
-              isRTL={isRTL}
-              onChange={(v) => {
-                updateSettings({ haptics: v });
-                if (v) buzz("medium");
-              }}
-            />
-
-            {settings.haptics && (
-              <View style={styles.hapticOptionsCard}>
-                <Text style={[styles.subOptionLabel, isRTL && styles.textRight]}>
-                  {t("haptic_intensity").toUpperCase()}
+          {/* Section 4: Notification Reminders */}
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.sectionIconPill}>
+                <Ionicons name="notifications-outline" size={16} color={Colors.primary} />
+              </View>
+              <View style={styles.flex1}>
+                <Text style={styles.sectionHeading}>NOTIFICATION REMINDERS</Text>
+                <Text style={styles.sectionSubtext}>
+                  Timed mission alerts and streak protection reminders
                 </Text>
-                <View style={styles.pillsRow}>
-                  {(["light", "medium", "heavy"] as HapticIntensity[]).map(
-                    (level) => {
-                      const isSelected = settings.hapticIntensity === level;
+              </View>
+            </View>
+
+            <View style={styles.sectionCard}>
+              <ToggleRow
+                icon="calendar-outline"
+                label="Daily Challenge Reminder"
+                description="Alerts you when a new daily puzzle is available"
+                value={settings.notifications.dailyReminder}
+                onChange={(v) => handleToggleNotification("dailyReminder", v)}
+              />
+              <ToggleRow
+                icon="flame-outline"
+                label="Streak Protector"
+                description="Warns you in the evening if your streak is in jeopardy"
+                value={settings.notifications.streakReminder}
+                onChange={(v) => handleToggleNotification("streakReminder", v)}
+              />
+              <ToggleRow
+                icon="alarm-outline"
+                label="Mission Expiration Alert"
+                description="Reminds you before daily or weekly missions reset"
+                value={settings.notifications.missionReminder}
+                onChange={(v) => handleToggleNotification("missionReminder", v)}
+              />
+              <ToggleRow
+                icon="megaphone-outline"
+                label="Special Event Alerts"
+                description="Notifies you of arcade events and bonus XP weekends"
+                value={settings.notifications.eventReminder}
+                onChange={(v) => handleToggleNotification("eventReminder", v)}
+              />
+
+              <View style={styles.subDivider} />
+
+              <View style={styles.testNotifWrap}>
+                <PrimaryButton
+                  variant="secondary"
+                  size="sm"
+                  onPress={handleSendTestNotification}
+                  icon={
+                    <Ionicons
+                      name="paper-plane-outline"
+                      size={15}
+                      color={Colors.text}
+                    />
+                  }
+                >
+                  Send Test Notification
+                </PrimaryButton>
+                {testNotifStatus ? (
+                  <View style={styles.testNotifStatusBadge}>
+                    <Ionicons name="checkmark-circle" size={14} color={Colors.mint} />
+                    <Text style={styles.testNotifText}>{testNotifStatus}</Text>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+          </View>
+
+          {/* Section 5: Audio & Sound Effects */}
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.sectionIconPill}>
+                <Ionicons name="volume-high-outline" size={16} color={Colors.accent} />
+              </View>
+              <View style={styles.flex1}>
+                <Text style={styles.sectionHeading}>AUDIO & HAPTICS</Text>
+                <Text style={styles.sectionSubtext}>
+                  Feedback volume and tactical vibration intensity
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.sectionCard}>
+              <ToggleRow
+                icon="musical-notes-outline"
+                label="Sound Effects"
+                description="Audio cues for guesses, triumphs, and button clicks"
+                value={settings.soundEnabled}
+                onChange={(v) => {
+                  buzz("light");
+                  updateSettings({ soundEnabled: v });
+                  if (v) playSound("button_click");
+                }}
+              />
+
+              {settings.soundEnabled && (
+                <View style={styles.subSettingGroup}>
+                  <Text style={styles.subOptionHeader}>SOUND VOLUME</Text>
+                  <View style={styles.pillsRow}>
+                    {[
+                      { label: "Quiet", val: 0.3, icon: "volume-low" },
+                      { label: "Balanced", val: 0.7, icon: "volume-medium" },
+                      { label: "Full", val: 1.0, icon: "volume-high" },
+                    ].map((p) => {
+                      const isSelected =
+                        Math.abs(settings.soundVolume - p.val) < 0.15;
                       return (
                         <Pressable
-                          key={level}
+                          key={p.label}
                           onPress={() => {
-                            updateSettings({ hapticIntensity: level });
-                            buzz(level === "heavy" ? "heavy" : level === "medium" ? "medium" : "light");
+                            buzz("light");
+                            updateSettings({ soundVolume: p.val });
+                            playSound("button_click");
                           }}
-                          style={[
+                          style={({ pressed }) => [
                             styles.intensityPill,
                             isSelected && styles.intensityPillActive,
+                            pressed && styles.buttonPressed,
                           ]}
                         >
+                          <Ionicons
+                            name={p.icon as any}
+                            size={13}
+                            color={isSelected ? Colors.accent : Colors.textMuted}
+                          />
                           <Text
                             style={[
                               styles.intensityPillText,
                               isSelected && styles.intensityPillTextActive,
                             ]}
                           >
-                            {level.toUpperCase()}
+                            {p.label}
                           </Text>
                         </Pressable>
                       );
-                    },
-                  )}
+                    })}
+                  </View>
                 </View>
-              </View>
-            )}
+              )}
+
+              <View style={styles.subDivider} />
+
+              <ToggleRow
+                icon="phone-portrait-outline"
+                label="Haptic Feedback"
+                description="Tactile pulses on button presses, range updates, and errors"
+                value={settings.haptics}
+                onChange={(v) => {
+                  updateSettings({ haptics: v });
+                  if (v) buzz("medium");
+                }}
+              />
+
+              {settings.haptics && (
+                <View style={styles.subSettingGroup}>
+                  <Text style={styles.subOptionHeader}>HAPTIC INTENSITY</Text>
+                  <View style={styles.pillsRow}>
+                    {(["light", "medium", "heavy"] as HapticIntensity[]).map(
+                      (level) => {
+                        const isSelected = settings.hapticIntensity === level;
+                        return (
+                          <Pressable
+                            key={level}
+                            onPress={() => {
+                              updateSettings({ hapticIntensity: level });
+                              buzz(
+                                level === "heavy"
+                                  ? "heavy"
+                                  : level === "medium"
+                                  ? "medium"
+                                  : "light",
+                              );
+                            }}
+                            style={({ pressed }) => [
+                              styles.intensityPill,
+                              isSelected && styles.intensityPillActive,
+                              pressed && styles.buttonPressed,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.intensityPillText,
+                                isSelected && styles.intensityPillTextActive,
+                              ]}
+                            >
+                              {level.toUpperCase()}
+                            </Text>
+                          </Pressable>
+                        );
+                      },
+                    )}
+                  </View>
+                </View>
+              )}
+            </View>
           </View>
 
-          {/* 7. Tutorial & Reset Data */}
-          <Text style={[styles.sectionHeader, isRTL && styles.textRight]}>
-            DATA & TUTORIAL
-          </Text>
-          <View style={styles.sectionGroup}>
-            <Pressable
-              onPress={() => {
-                buzz("light");
-                setShowTutorial(true);
-              }}
-              style={[styles.interactiveRow, isRTL && styles.rowReverse]}
-            >
-              <View style={[styles.interactiveLeft, isRTL && styles.rowReverse]}>
-                <Ionicons name="sparkles" size={20} color={Colors.accent} />
-                <View>
-                  <Text style={styles.interactiveTitle}>Review Tutorial</Text>
-                  <Text style={styles.interactiveSub}>
-                    Walk through game rules & deduction strategy
-                  </Text>
-                </View>
+          {/* Section 6: Data & Support */}
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.sectionIconPill}>
+                <Ionicons name="cube-outline" size={16} color={Colors.primary} />
               </View>
-              <Ionicons
-                name={LocalizationService.getChevronForward(settings.language)}
-                size={18}
-                color={Colors.textDim}
-              />
-            </Pressable>
-
-            <View style={styles.dangerCard}>
-              <View style={[styles.dangerLeft, isRTL && styles.rowReverse]}>
-                <Ionicons name="warning" size={20} color={Colors.coral} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.dangerTitle}>Erase Player Progress</Text>
-                  <Text style={styles.dangerDesc}>
-                    Clears all match records, win streaks, and earned badges
-                  </Text>
-                </View>
+              <View style={styles.flex1}>
+                <Text style={styles.sectionHeading}>DATA & RESOURCES</Text>
+                <Text style={styles.sectionSubtext}>
+                  Tutorial guide, developer spotlight, and data storage
+                </Text>
               </View>
-              <PrimaryButton
-                variant="danger"
-                size="sm"
-                onPress={confirmReset}
-                icon={<Ionicons name="trash-outline" size={14} color="#FFF" />}
-              >
-                Reset
-              </PrimaryButton>
             </View>
+
+            <View style={styles.sectionCard}>
+              {onOpenAboutDeveloper && (
+                <Pressable
+                  onPress={() => {
+                    buzz("light");
+                    playSound("button_click");
+                    onOpenAboutDeveloper();
+                  }}
+                  style={({ pressed }) => [
+                    styles.navLinkCard,
+                    pressed && styles.choiceCardPressed,
+                  ]}
+                >
+                  <View style={styles.navLinkLeft}>
+                    <View style={styles.navLinkIconPill}>
+                      <Ionicons
+                        name="person-circle-outline"
+                        size={20}
+                        color={Colors.primary}
+                      />
+                    </View>
+                    <View style={styles.flex1}>
+                      <Text style={styles.navLinkTitle}>About Developer</Text>
+                      <Text style={styles.navLinkSub}>
+                        Aliyaser Mousavi • Creator
+                      </Text>
+                    </View>
+                  </View>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={16}
+                    color={Colors.textDim}
+                  />
+                </Pressable>
+              )}
+
+              <Pressable
+                onPress={() => {
+                  buzz("light");
+                  setShowTutorial(true);
+                }}
+                style={({ pressed }) => [
+                  styles.navLinkCard,
+                  pressed && styles.choiceCardPressed,
+                ]}
+              >
+                <View style={styles.navLinkLeft}>
+                  <View
+                    style={[
+                      styles.navLinkIconPill,
+                      {
+                        backgroundColor: "rgba(255, 184, 0, 0.12)",
+                        borderColor: "rgba(255, 184, 0, 0.3)",
+                      },
+                    ]}
+                  >
+                    <Ionicons name="sparkles" size={18} color={Colors.accent} />
+                  </View>
+                  <View style={styles.flex1}>
+                    <Text style={[styles.navLinkTitle, { color: Colors.accent }]}>
+                      Review Interactive Tutorial
+                    </Text>
+                    <Text style={styles.navLinkSub}>
+                      Walk through game deduction strategy and rules
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={Colors.textDim}
+                />
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Section 7: Redesigned High-Craft Danger Zone */}
+          <View style={styles.dangerZoneContainer}>
+            <LinearGradient
+              colors={["rgba(255, 71, 87, 0.12)", "rgba(10, 14, 23, 0.95)"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.dangerGradientBg}
+            />
+
+            <View style={styles.dangerHeaderRow}>
+              <View style={styles.dangerIconBadge}>
+                <Ionicons name="warning" size={18} color={Colors.coral} />
+              </View>
+              <View style={styles.flex1}>
+                <Text style={styles.dangerSectionTitle}>TACTICAL RESET ZONE</Text>
+                <Text style={styles.dangerSectionSubtitle}>
+                  Permanent data clearance protocol
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.dangerInfoBox}>
+              <Text style={styles.dangerInfoText}>
+                Erasing player data will permanently delete your lifetime statistics,
+                win streaks, earned cosmetic trophies, and match history. This action
+                is immediate and cannot be recovered.
+              </Text>
+            </View>
+
+            <PrimaryButton
+              variant="danger"
+              size="md"
+              onPress={confirmReset}
+              style={styles.dangerResetButton}
+              icon={<Ionicons name="trash-outline" size={17} color={Colors.white} />}
+            >
+              ERASE ALL PLAYER PROGRESS
+            </PrimaryButton>
           </View>
         </ScrollView>
 
@@ -764,27 +884,23 @@ function ToggleRow({
   label,
   description,
   value,
-  isRTL = false,
   onChange,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   description: string;
   value: boolean;
-  isRTL?: boolean;
   onChange: (v: boolean) => void;
 }) {
   return (
-    <View style={[styles.toggleRow, isRTL && styles.rowReverse]}>
-      <View style={[styles.toggleLeft, isRTL && styles.rowReverse]}>
-        <Ionicons name={icon} size={20} color={Colors.primary} />
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.toggleTitle, isRTL && styles.textRight]}>
-            {label}
-          </Text>
-          <Text style={[styles.toggleDesc, isRTL && styles.textRight]}>
-            {description}
-          </Text>
+    <View style={styles.toggleRow}>
+      <View style={styles.toggleLeft}>
+        <View style={styles.toggleIconWrap}>
+          <Ionicons name={icon} size={18} color={Colors.primary} />
+        </View>
+        <View style={styles.flex1}>
+          <Text style={styles.toggleTitle}>{label}</Text>
+          <Text style={styles.toggleDesc}>{description}</Text>
         </View>
       </View>
       <Switch
@@ -798,56 +914,99 @@ function ToggleRow({
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 40,
-    gap: 12,
+  safe: {
+    flex: 1,
   },
-  headerRow: {
+  flex1: {
+    flex: 1,
+  },
+  buttonPressed: {
+    opacity: 0.75,
+    transform: [{ scale: 0.96 }],
+  },
+  headerBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 4,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
   },
-  rowReverse: {
-    flexDirection: "row-reverse",
-  },
-  textRight: {
-    textAlign: "right",
-  },
-  backBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.surface,
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.bgElevated,
     alignItems: "center",
     justifyContent: "center",
-  },
-  backBtnPressed: {
-    opacity: 0.6,
-  },
-  titleWrap: {
-    flex: 1,
-    alignItems: "center",
-  },
-  sectionHeader: {
-    fontFamily: FontFamily.mono,
-    color: Colors.textDim,
-    fontSize: 10,
-    letterSpacing: 1.5,
-    marginTop: 10,
-    paddingLeft: 2,
-  },
-  sectionGroup: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    padding: 14,
     borderWidth: 1,
     borderColor: Colors.border,
-    gap: 14,
   },
+  headerTitleWrap: {
+    alignItems: "center",
+  },
+  headerSubtitle: {
+    fontFamily: FontFamily.mono,
+    fontSize: 10,
+    color: Colors.accent,
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
+    marginTop: 2,
+  },
+  headerSpacer: {
+    width: 40,
+  },
+  scrollContent: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.hero,
+    gap: Spacing.lg,
+  },
+
+  /* Section Containers */
+  sectionContainer: {
+    gap: Spacing.sm,
+  },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 2,
+  },
+  sectionIconPill: {
+    width: 30,
+    height: 30,
+    borderRadius: Radius.xs,
+    backgroundColor: Colors.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: Colors.borderAccent,
+  },
+  sectionHeading: {
+    fontFamily: FontFamily.monoBold,
+    fontSize: 11,
+    color: Colors.text,
+    letterSpacing: 1.2,
+  },
+  sectionSubtext: {
+    fontFamily: FontFamily.sans,
+    fontSize: 11,
+    color: Colors.textDim,
+    marginTop: 1,
+  },
+  sectionCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: Spacing.md,
+    ...Shadows.sm,
+  },
+
+  /* Visual Themes Grid */
   themesGrid: {
     gap: 10,
   },
@@ -860,12 +1019,20 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     gap: 12,
   },
+  themeCardSelected: {
+    backgroundColor: Colors.bgElevated,
+    ...Shadows.glowGold,
+  },
   themeCardLocked: {
-    opacity: 0.5,
+    opacity: 0.55,
+  },
+  themeCardPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.99 }],
   },
   themeSwatch: {
-    width: 44,
-    height: 44,
+    width: 46,
+    height: 46,
     borderRadius: Radius.sm,
     borderWidth: 1.5,
     alignItems: "center",
@@ -881,10 +1048,25 @@ const styles = StyleSheet.create({
   themeInfo: {
     flex: 1,
   },
+  themeTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   themeName: {
     fontFamily: FontFamily.sansBold,
     fontSize: 14,
     color: Colors.text,
+  },
+  themeStatusBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Radius.xs,
+  },
+  themeStatusBadgeText: {
+    fontFamily: FontFamily.monoBold,
+    fontSize: 9,
+    letterSpacing: 0.5,
   },
   themeTagline: {
     fontFamily: FontFamily.sans,
@@ -892,16 +1074,32 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     marginTop: 2,
   },
-  equippedCheck: {
+  themeCheckWrap: {
     paddingRight: 4,
   },
   lockBadge: {
     paddingRight: 4,
   },
+
+  /* Sub Option Headers */
+  subOptionHeader: {
+    fontFamily: FontFamily.mono,
+    fontSize: 10,
+    color: Colors.textDim,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+  },
+  subDivider: {
+    height: 1,
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    marginVertical: 2,
+  },
+
+  /* Choice Cards (Radio List) */
   optionList: {
     gap: 8,
   },
-  choiceRow: {
+  choiceCard: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -912,68 +1110,97 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  choiceRowSelected: {
+  choiceCardSelected: {
     borderColor: Colors.accent,
     backgroundColor: "rgba(255, 184, 0, 0.08)",
   },
-  choiceLabel: {
-    fontFamily: FontFamily.sansMedium,
-    fontSize: 13,
-    color: Colors.text,
+  choiceCardPressed: {
+    opacity: 0.8,
   },
-  subDivider: {
-    height: 1,
-    backgroundColor: "rgba(255, 255, 255, 0.06)",
-    marginVertical: 4,
-  },
-  subOptionLabel: {
-    fontFamily: FontFamily.mono,
-    fontSize: 10,
-    color: Colors.textMuted,
-    letterSpacing: 1,
-  },
-  pillsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 4,
-  },
-  settingRow: {
+  choiceLeft: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     gap: 12,
-  },
-  settingRowLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
     flex: 1,
   },
-  rowTitle: {
+  choiceRadioOuter: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    borderColor: Colors.borderStrong,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  choiceRadioOuterActive: {
+    borderColor: Colors.accent,
+  },
+  choiceRadioInner: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.accent,
+  },
+  choiceTextWrap: {
+    flex: 1,
+  },
+  choiceLabel: {
     fontFamily: FontFamily.sansBold,
     fontSize: 13,
     color: Colors.text,
   },
-  rowSub: {
+  choiceDesc: {
     fontFamily: FontFamily.sans,
-    fontSize: 11,
-    color: Colors.textMuted,
+    fontSize: 10.5,
+    color: Colors.textDim,
     marginTop: 1,
   },
-  accessibilitySubBlock: {
-    gap: 6,
+  tagPill: {
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: Radius.xs,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
-  testNotifWrap: {
-    gap: 6,
-    marginTop: 4,
+  tagPillText: {
+    fontFamily: FontFamily.mono,
+    fontSize: 10,
+    color: Colors.textMuted,
   },
-  testNotifText: {
-    fontFamily: FontFamily.sans,
+
+  /* Pills Row */
+  pillsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  intensityPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.bgElevated,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  intensityPillActive: {
+    borderColor: Colors.accent,
+    backgroundColor: "rgba(255, 184, 0, 0.14)",
+  },
+  intensityPillText: {
+    fontFamily: FontFamily.monoBold,
     fontSize: 11,
-    color: Colors.mint,
-    textAlign: "center",
+    color: Colors.textMuted,
+    letterSpacing: 0.3,
   },
+  intensityPillTextActive: {
+    color: Colors.accent,
+  },
+
+  /* Toggle Row */
   toggleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -983,8 +1210,18 @@ const styles = StyleSheet.create({
   toggleLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
     flex: 1,
+  },
+  toggleIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius.xs,
+    backgroundColor: Colors.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: Colors.borderAccent,
   },
   toggleTitle: {
     fontFamily: FontFamily.sansBold,
@@ -996,90 +1233,129 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textMuted,
     lineHeight: 15,
-    marginTop: 1,
+    marginTop: 2,
   },
-  volumeRow: {
-    gap: 6,
-    paddingLeft: 30,
-  },
-  hapticOptionsCard: {
+  subSettingGroup: {
+    paddingLeft: 44,
     gap: 8,
-    paddingLeft: 30,
   },
-  intensityPill: {
-    paddingHorizontal: 12,
+
+  /* Test Notification Wrap */
+  testNotifWrap: {
+    gap: 8,
+  },
+  testNotifStatusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "rgba(61, 220, 151, 0.1)",
     paddingVertical: 6,
+    paddingHorizontal: 12,
     borderRadius: Radius.xs,
-    backgroundColor: Colors.bgElevated,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: "rgba(61, 220, 151, 0.25)",
   },
-  intensityPillActive: {
-    borderColor: Colors.accent,
-    backgroundColor: "rgba(255, 184, 0, 0.15)",
+  testNotifText: {
+    fontFamily: FontFamily.sans,
+    fontSize: 11,
+    color: Colors.mint,
   },
-  intensityPillText: {
-    fontFamily: FontFamily.mono,
-    fontSize: 10,
-    color: Colors.textMuted,
-    fontWeight: "700",
-  },
-  intensityPillTextActive: {
-    color: Colors.accent,
-  },
-  interactiveRow: {
+
+  /* Nav Links in Data Section */
+  navLinkCard: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "rgba(255, 184, 0, 0.08)",
+    backgroundColor: Colors.bgElevated,
     padding: 12,
-    borderRadius: Radius.sm,
+    borderRadius: Radius.md,
     borderWidth: 1,
-    borderColor: "rgba(255, 184, 0, 0.25)",
+    borderColor: Colors.border,
   },
-  interactiveLeft: {
+  navLinkLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
     flex: 1,
   },
-  interactiveTitle: {
+  navLinkIconPill: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: Colors.borderAccent,
+  },
+  navLinkTitle: {
     fontFamily: FontFamily.sansBold,
     fontSize: 13,
-    color: Colors.accent,
+    color: Colors.text,
   },
-  interactiveSub: {
+  navLinkSub: {
     fontFamily: FontFamily.sans,
     fontSize: 11,
     color: Colors.textMuted,
     marginTop: 1,
   },
-  dangerCard: {
+
+  /* Redesigned Danger Zone */
+  dangerZoneContainer: {
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: "rgba(255, 71, 87, 0.35)",
+    overflow: "hidden",
+    position: "relative",
+    gap: Spacing.md,
+  },
+  dangerGradientBg: {
+    ...StyleSheet.absoluteFill,
+  },
+  dangerHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: 12,
+  },
+  dangerIconBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.sm,
+    backgroundColor: "rgba(255, 71, 87, 0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255, 71, 87, 0.35)",
+  },
+  dangerSectionTitle: {
+    fontFamily: FontFamily.monoBold,
+    fontSize: 12,
+    color: Colors.coral,
+    letterSpacing: 1.2,
+  },
+  dangerSectionSubtitle: {
+    fontFamily: FontFamily.sans,
+    fontSize: 11,
+    color: Colors.textDim,
+    marginTop: 1,
+  },
+  dangerInfoBox: {
     backgroundColor: "rgba(255, 71, 87, 0.08)",
     padding: 12,
     borderRadius: Radius.sm,
     borderWidth: 1,
-    borderColor: "rgba(255, 71, 87, 0.25)",
-    gap: 10,
+    borderColor: "rgba(255, 71, 87, 0.2)",
   },
-  dangerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    flex: 1,
-  },
-  dangerTitle: {
-    fontFamily: FontFamily.sansBold,
-    fontSize: 13,
-    color: Colors.coral,
-  },
-  dangerDesc: {
+  dangerInfoText: {
     fontFamily: FontFamily.sans,
-    fontSize: 11,
+    fontSize: 11.5,
+    lineHeight: 18,
     color: Colors.textMuted,
-    marginTop: 1,
+  },
+  dangerResetButton: {
+    width: "100%",
   },
 });

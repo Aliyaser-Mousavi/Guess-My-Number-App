@@ -1,15 +1,22 @@
+// ==============================================================================
+// Screen: ProgressionScreen.tsx
+// Description: Modernized progression and rank telemetry hub for MarsGuess.
+//              Features high-craft Level & XP hero card, competitive rating (CR)
+//              rank card with tier styling, glowing tactical Locker banner,
+//              daily/weekly mission feeds, and achievement milestones preview.
+// ==============================================================================
+
 import CosmeticLockerModal from "@/components/progression/CosmeticLockerModal";
 import MissionCard from "@/components/progression/MissionCard";
-import Card from "@/components/ui/Card";
-import PrimaryButton from "@/components/ui/PrimaryButton";
 import ScreenBackground from "@/components/ui/ScreenBackground";
 import Title from "@/components/ui/Title";
 import Colors from "@/constants/colors";
-import { FontFamily, Radius } from "@/constants/theme";
+import { FontFamily, Radius, Shadows, Spacing } from "@/constants/theme";
 import { useGame } from "@/context/GameProvider";
 import { AchievementService } from "@/services/achievements/AchievementService";
 import { CosmeticsService } from "@/services/cosmetics/CosmeticsService";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useMemo, useState } from "react";
 import {
   Pressable,
@@ -39,6 +46,7 @@ export default function ProgressionScreen({
     claimMission,
     buzz,
     playSound,
+    formatNumber,
   } = useGame();
 
   const [showLocker, setShowLocker] = useState(false);
@@ -79,59 +87,72 @@ export default function ProgressionScreen({
 
   return (
     <ScreenBackground>
-      <SafeAreaView style={styles.safe}>
-        <ScrollView
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Header Row */}
-          <View style={styles.headerRow}>
-            <Pressable
-              onPress={() => {
-                buzz("light");
-                onBack();
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Go back"
-              style={({ pressed }) => [
-                styles.backBtn,
-                pressed && styles.backBtnPressed,
-              ]}
-            >
-              <Ionicons name="arrow-back" size={20} color={Colors.text} />
-            </Pressable>
-            <View style={styles.titleWrap}>
-              <Title size="lg">Progression</Title>
-            </View>
-            <Pressable
-              onPress={() => {
-                buzz("light");
-                setShowLocker(true);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Open Locker"
-              style={({ pressed }) => [
-                styles.lockerIconBtn,
-                pressed && styles.backBtnPressed,
-              ]}
-            >
-              <Ionicons name="shirt-outline" size={18} color={Colors.accent} />
-            </Pressable>
+      <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+        {/* Navigation Bar */}
+        <View style={styles.headerBar}>
+          <Pressable
+            onPress={() => {
+              buzz("light");
+              playSound("button_click");
+              onBack();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            style={({ pressed }) => [
+              styles.navBtn,
+              pressed && styles.buttonPressed,
+            ]}
+          >
+            <Ionicons name="arrow-back" size={20} color={Colors.text} />
+          </Pressable>
+
+          <View style={styles.headerTitleWrap}>
+            <Title size="md">Progression Hub</Title>
+            <Text style={styles.headerSubtitle}>XP & Tactical Ranks</Text>
           </View>
 
-          <Text style={styles.subtitle}>
-            Level progression, competitive ranks, daily missions & cosmetic locker
-          </Text>
+          <Pressable
+            onPress={() => {
+              buzz("light");
+              playSound("button_click");
+              setShowLocker(true);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Open Locker"
+            style={({ pressed }) => [
+              styles.navBtn,
+              styles.lockerNavBtn,
+              pressed && styles.buttonPressed,
+            ]}
+          >
+            <Ionicons name="shirt-outline" size={17} color={Colors.accent} />
+          </Pressable>
+        </View>
 
-          {/* Hero Card: Level & XP Bar */}
-          <Card variant="elevated" style={styles.levelCard}>
-            <View style={styles.levelHeader}>
-              <View style={styles.levelBadgeWrap}>
-                <View style={styles.levelCircle}>
-                  <Text style={styles.levelNum}>{progression.level}</Text>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Section 1: Hero Level & Hunter XP Card */}
+          <View style={styles.heroLevelCard}>
+            <LinearGradient
+              colors={["rgba(255, 184, 0, 0.14)", "rgba(10, 14, 23, 0.95)"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.cardGradientBg}
+            />
+
+            <View style={styles.levelCardTop}>
+              <View style={styles.levelBadgeGroup}>
+                <View style={styles.levelOrbContainer}>
+                  <View style={styles.levelOrbHalo} />
+                  <View style={styles.levelOrb}>
+                    <Text style={styles.levelNum}>{formatNumber(progression.level)}</Text>
+                  </View>
                 </View>
-                <View>
-                  <Text style={styles.levelSubLabel}>HUNTER LEVEL</Text>
+
+                <View style={styles.levelInfoTextWrap}>
+                  <Text style={styles.levelSubLabel}>HUNTER PROTOCOL</Text>
                   <Text style={styles.rankTitleText}>
                     {progression.rankTitle}
                   </Text>
@@ -141,7 +162,7 @@ export default function ProgressionScreen({
               <View style={styles.totalXpPill}>
                 <Ionicons name="sparkles" size={12} color={Colors.accent} />
                 <Text style={styles.totalXpText}>
-                  {progression.totalXp.toLocaleString()} Total XP
+                  {formatNumber(progression.totalXp)} XP
                 </Text>
               </View>
             </View>
@@ -149,36 +170,64 @@ export default function ProgressionScreen({
             {/* Level XP Progress Bar */}
             <View style={styles.xpSection}>
               <View style={styles.xpNumbersRow}>
-                <Text style={styles.xpLabel}>PROGRESS TO LEVEL {progression.level + 1}</Text>
+                <View style={styles.xpLabelGroup}>
+                  <Ionicons name="trending-up" size={12} color={Colors.accent} />
+                  <Text style={styles.xpLabel}>
+                    PROGRESS TO LEVEL {formatNumber(progression.level + 1)}
+                  </Text>
+                </View>
                 <Text style={styles.xpFraction}>
-                  {progression.currentXp.toLocaleString()} /{" "}
-                  {progression.nextLevelXp.toLocaleString()} XP
+                  {formatNumber(progression.currentXp)} /{" "}
+                  {formatNumber(progression.nextLevelXp)} XP
                 </Text>
               </View>
+
               <View style={styles.xpTrack}>
                 <View style={[styles.xpFill, { width: `${xpPercent}%` }]} />
               </View>
-            </View>
-          </Card>
 
-          {/* Competitive Rank Card */}
-          <Card variant="elevated" style={styles.rankCard}>
+              <View style={styles.xpMetaFooter}>
+                <Text style={styles.xpRemainingText}>
+                  {formatNumber(progression.nextLevelXp - progression.currentXp)} XP to next tier
+                </Text>
+                <Text style={styles.xpPercentText}>{xpPercent}%</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Section 2: Competitive Rank Card */}
+          <View
+            style={[
+              styles.heroRankCard,
+              { borderColor: `${competitiveRank.tierColor}45` },
+            ]}
+          >
+            <LinearGradient
+              colors={[`${competitiveRank.tierColor}16`, "rgba(10, 14, 23, 0.95)"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.cardGradientBg}
+            />
+
             <View style={styles.rankTopRow}>
-              <View style={styles.rankLeft}>
+              <View style={styles.rankLeftGroup}>
                 <View
                   style={[
                     styles.rankIconCircle,
-                    { backgroundColor: competitiveRank.tierColor + "22" },
+                    {
+                      backgroundColor: `${competitiveRank.tierColor}20`,
+                      borderColor: `${competitiveRank.tierColor}40`,
+                    },
                   ]}
                 >
                   <Ionicons
                     name={competitiveRank.tierIcon as any}
-                    size={22}
+                    size={24}
                     color={competitiveRank.tierColor}
                   />
                 </View>
-                <View>
-                  <Text style={styles.rankTierLabel}>COMPETITIVE RANK</Text>
+                <View style={styles.rankMetaText}>
+                  <Text style={styles.rankTierLabel}>COMPETITIVE STANDING</Text>
                   <Text
                     style={[
                       styles.rankTierName,
@@ -190,9 +239,23 @@ export default function ProgressionScreen({
                 </View>
               </View>
 
-              <View style={styles.crPill}>
-                <Text style={styles.crText}>
-                  {competitiveRank.rating} CR
+              <View
+                style={[
+                  styles.crPill,
+                  {
+                    borderColor: `${competitiveRank.tierColor}40`,
+                    backgroundColor: `${competitiveRank.tierColor}14`,
+                  },
+                ]}
+              >
+                <Ionicons name="trophy" size={12} color={competitiveRank.tierColor} />
+                <Text
+                  style={[
+                    styles.crText,
+                    { color: competitiveRank.tierColor },
+                  ]}
+                >
+                  {formatNumber(competitiveRank.rating)} CR
                 </Text>
               </View>
             </View>
@@ -202,10 +265,15 @@ export default function ProgressionScreen({
               <View style={styles.crProgressRow}>
                 <Text style={styles.crProgressLabel}>
                   {competitiveRank.tier === "grandmaster"
-                    ? "Pinnacle Grandmaster Rank"
-                    : `Next Tier: ${competitiveRank.nextTierRating} CR`}
+                    ? "Pinnacle Grandmaster Rank Achieved"
+                    : `Next Tier: ${formatNumber(competitiveRank.nextTierRating)} CR Target`}
                 </Text>
-                <Text style={styles.crPercentText}>
+                <Text
+                  style={[
+                    styles.crPercentText,
+                    { color: competitiveRank.tierColor },
+                  ]}
+                >
                   {competitiveRank.progressPercent}%
                 </Text>
               </View>
@@ -221,92 +289,162 @@ export default function ProgressionScreen({
                 />
               </View>
             </View>
-          </Card>
+          </View>
 
-          {/* Locker & Active Customization Banner */}
-          <View style={styles.lockerBanner}>
+          {/* Section 3: Overhauled Locker & Customization Banner */}
+          <View style={styles.lockerTacticalBanner}>
+            <LinearGradient
+              colors={["rgba(0, 229, 255, 0.12)", "rgba(10, 14, 23, 0.95)"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.cardGradientBg}
+            />
+
             <View style={styles.lockerPreviewLeft}>
-              <View style={styles.activeAvatarWrap}>
-                <Ionicons name="sparkles" size={18} color={Colors.accent} />
+              <View style={styles.lockerIconPill}>
+                <Ionicons name="sparkles" size={18} color={Colors.primary} />
               </View>
-              <View>
-                <Text style={styles.lockerBannerTitle}>Arcade Locker</Text>
-                <Text style={styles.lockerBannerSub}>
-                  Equipped: {CosmeticsService.getTitleName(profile.titleId)}
+              <View style={styles.flex1}>
+                <View style={styles.lockerTitleRow}>
+                  <Text style={styles.lockerBannerTitle}>Tactical Locker</Text>
+                  <View style={styles.lockerActiveBadge}>
+                    <Text style={styles.lockerActiveBadgeText}>ACTIVE</Text>
+                  </View>
+                </View>
+                <Text style={styles.lockerBannerSub} numberOfLines={1}>
+                  Equipped Title: {CosmeticsService.getTitleName(profile.titleId) ?? "Deduction Operative"}
                 </Text>
               </View>
             </View>
-            <PrimaryButton
-              variant="accent"
-              size="sm"
+
+            <Pressable
               onPress={() => {
                 buzz("light");
+                playSound("button_click");
                 setShowLocker(true);
               }}
-              icon={<Ionicons name="shirt-outline" size={14} color={Colors.bg} />}
+              accessibilityRole="button"
+              accessibilityLabel="Open Locker"
+              style={({ pressed }) => [
+                styles.lockerBannerActionBtn,
+                pressed && styles.buttonPressed,
+              ]}
             >
-              Open Locker
-            </PrimaryButton>
-          </View>
-
-          {/* Daily Missions */}
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionHeader}>DAILY MISSIONS</Text>
-            <Text style={styles.sectionSub}>Refreshes every 24 hours</Text>
-          </View>
-          <View style={styles.missionsList}>
-            {dailyMissions.map((m) => (
-              <MissionCard
-                key={m.id}
-                mission={m}
-                onClaim={handleClaimMission}
-              />
-            ))}
-          </View>
-
-          {/* Weekly Missions */}
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionHeader}>WEEKLY MARATHON</Text>
-            <Text style={styles.sectionSub}>Refreshes weekly</Text>
-          </View>
-          <View style={styles.missionsList}>
-            {weeklyMissions.map((m) => (
-              <MissionCard
-                key={m.id}
-                mission={m}
-                onClaim={handleClaimMission}
-              />
-            ))}
-          </View>
-
-          {/* Achievements Preview */}
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionHeader}>ACCOMPLISHMENTS</Text>
-            <Pressable onPress={onOpenAchievements}>
-              <Text style={styles.viewAllText}>View All ({recentAchievements.length})</Text>
+              <Ionicons name="shirt-outline" size={14} color={Colors.bg} />
+              <Text style={styles.lockerBannerActionBtnText}>Locker</Text>
             </Pressable>
           </View>
 
-          <Card variant="default" style={styles.achievementsCard}>
-            <View style={styles.achRow}>
-              <View style={styles.achIconWrap}>
-                <Ionicons name="ribbon" size={20} color={Colors.accent} />
+          {/* Section 4: Daily Missions */}
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.sectionIconPill}>
+                <Ionicons name="calendar-outline" size={15} color={Colors.primary} />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.achTitle}>Badges & Trophies</Text>
-                <Text style={styles.achSub}>
-                  {stats.unlockedAchievements.length} of 25 Badges Unlocked
-                </Text>
+              <View style={styles.flex1}>
+                <Text style={styles.sectionHeader}>DAILY MISSIONS</Text>
+                <Text style={styles.sectionSub}>Refreshes every 24 hours</Text>
               </View>
-              <PrimaryButton
-                variant="secondary"
-                size="sm"
-                onPress={onOpenAchievements}
-              >
-                Badges
-              </PrimaryButton>
             </View>
-          </Card>
+
+            <View style={styles.missionsList}>
+              {dailyMissions.map((m) => (
+                <MissionCard
+                  key={m.id}
+                  mission={m}
+                  onClaim={handleClaimMission}
+                />
+              ))}
+            </View>
+          </View>
+
+          {/* Section 5: Weekly Marathon */}
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.sectionIconPill}>
+                <Ionicons name="flame-outline" size={15} color={Colors.coral} />
+              </View>
+              <View style={styles.flex1}>
+                <Text style={styles.sectionHeader}>WEEKLY MARATHON</Text>
+                <Text style={styles.sectionSub}>Long-term arcade challenges</Text>
+              </View>
+            </View>
+
+            <View style={styles.missionsList}>
+              {weeklyMissions.map((m) => (
+                <MissionCard
+                  key={m.id}
+                  mission={m}
+                  onClaim={handleClaimMission}
+                />
+              ))}
+            </View>
+          </View>
+
+          {/* Section 6: Accomplishments & Badges Preview */}
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.sectionIconPill}>
+                <Ionicons name="ribbon-outline" size={15} color={Colors.accent} />
+              </View>
+              <View style={styles.flex1}>
+                <Text style={styles.sectionHeader}>ACCOMPLISHMENTS</Text>
+                <Text style={styles.sectionSub}>Trophy milestones & badges</Text>
+              </View>
+              <Pressable
+                onPress={() => {
+                  buzz("light");
+                  playSound("button_click");
+                  onOpenAchievements();
+                }}
+                style={({ pressed }) => [
+                  styles.viewAllPill,
+                  pressed && styles.buttonPressed,
+                ]}
+              >
+                <Text style={styles.viewAllText}>
+                  View All ({recentAchievements.length})
+                </Text>
+                <Ionicons name="chevron-forward" size={13} color={Colors.accent} />
+              </Pressable>
+            </View>
+
+            <View style={styles.achievementsCard}>
+              <LinearGradient
+                colors={["rgba(255, 184, 0, 0.09)", "rgba(10, 14, 23, 0.95)"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.cardGradientBg}
+              />
+              <View style={styles.achRow}>
+                <View style={styles.achIconWrap}>
+                  <Ionicons name="trophy" size={20} color={Colors.accent} />
+                </View>
+                <View style={styles.flex1}>
+                  <Text style={styles.achTitle}>Badges & Trophies</Text>
+                  <Text style={styles.achSub}>
+                    {formatNumber(stats.unlockedAchievements.length)} of 25 Badges Unlocked
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => {
+                    buzz("light");
+                    playSound("button_click");
+                    onOpenAchievements();
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="View badges"
+                  style={({ pressed }) => [
+                    styles.achActionBtn,
+                    pressed && styles.buttonPressed,
+                  ]}
+                >
+                  <Ionicons name="medal-outline" size={14} color={Colors.accent} />
+                  <Text style={styles.achActionBtnText}>Badges</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
         </ScrollView>
 
         {/* Cosmetic Locker Modal */}
@@ -320,128 +458,172 @@ export default function ProgressionScreen({
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 40,
-    gap: 14,
-  },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  backBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  lockerIconBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: Radius.md,
-    backgroundColor: "rgba(255, 184, 0, 0.12)",
-    borderWidth: 1,
-    borderColor: Colors.accent,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  backBtnPressed: {
-    opacity: 0.6,
-  },
-  titleWrap: {
+  safe: {
     flex: 1,
+  },
+  flex1: {
+    flex: 1,
+  },
+  buttonPressed: {
+    opacity: 0.75,
+    transform: [{ scale: 0.96 }],
+  },
+  headerBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  navBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.bgElevated,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  lockerNavBtn: {
+    backgroundColor: "rgba(255, 184, 0, 0.12)",
+    borderColor: "rgba(255, 184, 0, 0.35)",
+  },
+  headerTitleWrap: {
     alignItems: "center",
   },
-  subtitle: {
-    fontFamily: FontFamily.body,
-    fontSize: 13,
-    color: Colors.textMuted,
-    textAlign: "center",
-    lineHeight: 18,
+  headerSubtitle: {
+    fontFamily: FontFamily.mono,
+    fontSize: 10,
+    color: Colors.accent,
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
+    marginTop: 2,
   },
-  levelCard: {
-    padding: 16,
-    gap: 14,
+  scrollContent: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.hero,
+    gap: Spacing.lg,
   },
-  levelHeader: {
+
+  /* Card Gradient Background */
+  cardGradientBg: {
+    ...StyleSheet.absoluteFill,
+  },
+
+  /* Hero Level Card */
+  heroLevelCard: {
+    borderRadius: Radius.xl,
+    padding: Spacing.lg,
+    backgroundColor: Colors.bgElevated,
+    borderWidth: 1,
+    borderColor: "rgba(255, 184, 0, 0.35)",
+    overflow: "hidden",
+    position: "relative",
+    gap: Spacing.md,
+    ...Shadows.glowGold,
+  },
+  levelCardTop: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  levelBadgeWrap: {
+  levelBadgeGroup: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
   },
-  levelCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: Radius.full,
-    backgroundColor: "rgba(255, 184, 0, 0.15)",
+  levelOrbContainer: {
+    width: 52,
+    height: 52,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  levelOrbHalo: {
+    position: "absolute",
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "rgba(255, 184, 0, 0.2)",
+  },
+  levelOrb: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.surface,
     borderWidth: 2,
     borderColor: Colors.accent,
     alignItems: "center",
     justifyContent: "center",
+    ...Shadows.sm,
   },
   levelNum: {
     fontFamily: FontFamily.display,
     fontSize: 22,
     color: Colors.accent,
   },
+  levelInfoTextWrap: {
+    gap: 2,
+  },
   levelSubLabel: {
     fontFamily: FontFamily.mono,
-    fontSize: 9,
-    color: Colors.textMuted,
-    letterSpacing: 1,
+    fontSize: 9.5,
+    color: Colors.textDim,
+    letterSpacing: 1.2,
   },
   rankTitleText: {
-    fontFamily: FontFamily.sansBold,
-    fontSize: 15,
+    fontFamily: FontFamily.display,
+    fontSize: 16,
     color: Colors.text,
   },
   totalXpPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    gap: 5,
+    backgroundColor: "rgba(255, 184, 0, 0.12)",
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: "rgba(255, 184, 0, 0.25)",
   },
   totalXpText: {
-    fontFamily: FontFamily.mono,
-    fontSize: 10,
-    color: Colors.textMuted,
+    fontFamily: FontFamily.monoBold,
+    fontSize: 11,
+    color: Colors.accent,
   },
   xpSection: {
-    gap: 6,
+    gap: 7,
   },
   xpNumbersRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
+  xpLabelGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
   xpLabel: {
     fontFamily: FontFamily.mono,
-    fontSize: 9,
+    fontSize: 9.5,
     color: Colors.textMuted,
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
   xpFraction: {
-    fontFamily: FontFamily.mono,
+    fontFamily: FontFamily.monoBold,
     fontSize: 11,
     color: Colors.text,
-    fontWeight: "700",
   },
   xpTrack: {
     height: 8,
     borderRadius: 4,
-    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
     overflow: "hidden",
   },
   xpFill: {
@@ -449,49 +631,76 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent,
     borderRadius: 4,
   },
-  rankCard: {
-    padding: 16,
-    gap: 12,
+  xpMetaFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  xpRemainingText: {
+    fontFamily: FontFamily.sans,
+    fontSize: 10.5,
+    color: Colors.textDim,
+  },
+  xpPercentText: {
+    fontFamily: FontFamily.monoBold,
+    fontSize: 10.5,
+    color: Colors.accent,
+  },
+
+  /* Competitive Rank Card */
+  heroRankCard: {
+    borderRadius: Radius.xl,
+    padding: Spacing.lg,
+    backgroundColor: Colors.bgElevated,
+    borderWidth: 1,
+    overflow: "hidden",
+    position: "relative",
+    gap: Spacing.md,
+    ...Shadows.sm,
   },
   rankTopRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  rankLeft: {
+  rankLeftGroup: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
   },
   rankIconCircle: {
-    width: 44,
-    height: 44,
+    width: 46,
+    height: 46,
     borderRadius: Radius.md,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+  },
+  rankMetaText: {
+    gap: 2,
   },
   rankTierLabel: {
     fontFamily: FontFamily.mono,
-    fontSize: 9,
-    color: Colors.textMuted,
-    letterSpacing: 1,
+    fontSize: 9.5,
+    color: Colors.textDim,
+    letterSpacing: 1.2,
   },
   rankTierName: {
     fontFamily: FontFamily.display,
     fontSize: 18,
-    marginTop: 2,
   },
   crPill: {
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
-    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 11,
     paddingVertical: 5,
     borderRadius: Radius.full,
+    borderWidth: 1,
   },
   crText: {
-    fontFamily: FontFamily.mono,
+    fontFamily: FontFamily.monoBold,
     fontSize: 12,
-    fontWeight: "700",
-    color: Colors.text,
   },
   crProgressSection: {
     gap: 6,
@@ -499,6 +708,7 @@ const styles = StyleSheet.create({
   crProgressRow: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "center",
   },
   crProgressLabel: {
     fontFamily: FontFamily.mono,
@@ -506,47 +716,75 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
   },
   crPercentText: {
-    fontFamily: FontFamily.mono,
-    fontSize: 10,
-    color: Colors.textMuted,
+    fontFamily: FontFamily.monoBold,
+    fontSize: 10.5,
   },
   crTrack: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
     overflow: "hidden",
   },
   crFill: {
     height: "100%",
-    borderRadius: 3,
+    borderRadius: 3.5,
   },
-  lockerBanner: {
+
+  /* Tactical Locker Banner */
+  lockerTacticalBanner: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: Colors.surface,
-    padding: 14,
-    borderRadius: Radius.md,
+    paddingVertical: 12,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.lg,
     borderWidth: 1,
-    borderColor: "rgba(255, 184, 0, 0.15)",
+    borderColor: Colors.borderAccent,
+    overflow: "hidden",
+    position: "relative",
+    gap: 12,
+    ...Shadows.glowTeal,
   },
   lockerPreviewLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
+    flex: 1,
   },
-  activeAvatarWrap: {
-    width: 36,
-    height: 36,
+  lockerIconPill: {
+    width: 38,
+    height: 38,
     borderRadius: Radius.sm,
-    backgroundColor: "rgba(255, 184, 0, 0.15)",
+    backgroundColor: "rgba(0, 229, 255, 0.12)",
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(0, 229, 255, 0.25)",
+  },
+  lockerTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   lockerBannerTitle: {
     fontFamily: FontFamily.sansBold,
-    fontSize: 13,
+    fontSize: 13.5,
     color: Colors.text,
+  },
+  lockerActiveBadge: {
+    backgroundColor: "rgba(0, 229, 255, 0.12)",
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: Radius.xs,
+    borderWidth: 1,
+    borderColor: "rgba(0, 229, 255, 0.25)",
+  },
+  lockerActiveBadgeText: {
+    fontFamily: FontFamily.monoBold,
+    fontSize: 8.5,
+    color: Colors.primary,
+    letterSpacing: 0.5,
   },
   lockerBannerSub: {
     fontFamily: FontFamily.sans,
@@ -554,33 +792,88 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     marginTop: 2,
   },
+  lockerBannerActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: Colors.accent,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: Radius.sm,
+    shadowColor: Colors.accent,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  lockerBannerActionBtnText: {
+    fontFamily: FontFamily.sansBold,
+    fontSize: 12,
+    color: Colors.bg,
+    letterSpacing: 0.3,
+  },
+
+  /* Section Containers */
+  sectionContainer: {
+    gap: Spacing.sm,
+  },
   sectionHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 4,
+    gap: 10,
+    paddingHorizontal: 2,
+  },
+  sectionIconPill: {
+    width: 30,
+    height: 30,
+    borderRadius: Radius.xs,
+    backgroundColor: Colors.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: Colors.borderAccent,
   },
   sectionHeader: {
-    fontFamily: FontFamily.mono,
+    fontFamily: FontFamily.monoBold,
     fontSize: 11,
-    color: Colors.textMuted,
-    letterSpacing: 1,
+    color: Colors.text,
+    letterSpacing: 1.2,
   },
   sectionSub: {
     fontFamily: FontFamily.sans,
     fontSize: 11,
-    color: Colors.textMuted,
+    color: Colors.textDim,
+    marginTop: 1,
   },
   missionsList: {
     gap: 10,
   },
+  viewAllPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(255, 184, 0, 0.1)",
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: "rgba(255, 184, 0, 0.3)",
+  },
   viewAllText: {
-    fontFamily: FontFamily.sansMedium,
-    fontSize: 12,
+    fontFamily: FontFamily.sansBold,
+    fontSize: 11,
     color: Colors.accent,
   },
   achievementsCard: {
-    padding: 14,
+    backgroundColor: Colors.surface,
+    padding: Spacing.md,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: "rgba(255, 184, 0, 0.3)",
+    overflow: "hidden",
+    position: "relative",
+    ...Shadows.glowGold,
   },
   achRow: {
     flexDirection: "row",
@@ -588,12 +881,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   achIconWrap: {
-    width: 38,
-    height: 38,
+    width: 42,
+    height: 42,
     borderRadius: Radius.sm,
-    backgroundColor: "rgba(255, 184, 0, 0.12)",
+    backgroundColor: "rgba(255, 184, 0, 0.16)",
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255, 184, 0, 0.35)",
   },
   achTitle: {
     fontFamily: FontFamily.sansBold,
@@ -605,5 +900,21 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textMuted,
     marginTop: 2,
+  },
+  achActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(255, 184, 0, 0.12)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: "rgba(255, 184, 0, 0.35)",
+  },
+  achActionBtnText: {
+    fontFamily: FontFamily.sansBold,
+    fontSize: 12,
+    color: Colors.accent,
   },
 });

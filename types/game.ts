@@ -18,7 +18,8 @@ export type AppScreen =
   | "tournaments"
   | "seasons"
   | "academy"
-  | "coach";
+  | "coach"
+  | "aboutDeveloper";
 
 // ==========================================
 // 1. Core Gameplay Results
@@ -382,9 +383,9 @@ export type ColorBlindOption =
   | "deuteranopia"
   | "tritanopia";
 
-export type LanguageOption = "en" | "fa";
+export type LanguageOption = "en";
 
-export type DigitFormatOption = "latin" | "persian";
+export type DigitFormatOption = "latin";
 
 export type NotificationPreferences = {
   dailyReminder: boolean;

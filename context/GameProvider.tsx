@@ -25,10 +25,6 @@ import {
   type DifficultyRecommendation,
   type CreateSessionParams,
 } from "@/services";
-import {
-  LocalizationService,
-  type TranslationKey,
-} from "@/services/localization/LocalizationService";
 import { NotificationService } from "@/services/notifications/NotificationService";
 import {
   ThemeService,
@@ -124,10 +120,8 @@ type GameContextValue = {
   setTheme: (themeId: ThemeId) => void;
   theme: ThemeDefinition;
   themeColors: ThemeColors;
-  t: (key: TranslationKey, params?: Record<string, string | number>) => string;
   formatNumber: (val: number | string | null | undefined) => string;
   formatDate: (val: number | Date) => string;
-  isRTL: boolean;
 
   // Group 07B Additions (Cloud Sync)
   appState: AppStateV2;
@@ -798,27 +792,28 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     ],
   );
 
-  const isRTL = useMemo(
-    () => LocalizationService.isRTL(appState.settings.language),
-    [appState.settings.language],
-  );
-
-  const t = useCallback(
-    (key: TranslationKey, params?: Record<string, string | number>) =>
-      LocalizationService.t(key, appState.settings.language, params),
-    [appState.settings.language],
-  );
-
   const formatNumber = useCallback(
-    (val: number | string | null | undefined) =>
-      LocalizationService.formatNumber(val, appState.settings.digitFormat),
-    [appState.settings.digitFormat],
+    (val: number | string | null | undefined) => {
+      if (val == null) return "";
+      return String(val);
+    },
+    [],
   );
 
   const formatDate = useCallback(
-    (val: number | Date) =>
-      LocalizationService.formatDate(val, appState.settings.language),
-    [appState.settings.language],
+    (val: number | Date) => {
+      const d = typeof val === "number" ? new Date(val) : val;
+      try {
+        return new Intl.DateTimeFormat("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        }).format(d);
+      } catch {
+        return d.toLocaleDateString();
+      }
+    },
+    [],
   );
 
   const value = useMemo(
@@ -858,10 +853,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       setTheme,
       theme,
       themeColors,
-      t,
       formatNumber,
       formatDate,
-      isRTL,
       appState,
       applyCloudSync,
     }),
@@ -892,10 +885,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       setTheme,
       theme,
       themeColors,
-      t,
       formatNumber,
       formatDate,
-      isRTL,
       applyCloudSync,
     ],
   );

@@ -41,7 +41,7 @@ type SubTab = "season" | "events";
 
 export default function SeasonsScreen({ onBack, onPlayEvent }: Props) {
   const { user } = useAuth();
-  const { buzz, playSound, competitiveRank, isRTL } = useGame();
+  const { buzz, playSound, competitiveRank } = useGame();
 
   const [tab, setTab] = useState<SubTab>("season");
   const [loading, setLoading] = useState(true);
@@ -112,13 +112,13 @@ export default function SeasonsScreen({ onBack, onPlayEvent }: Props) {
     <ScreenBackground>
       <SafeAreaView style={styles.safeArea}>
         {/* Top Header */}
-        <View style={[styles.header, isRTL && styles.rowReverse]}>
+        <View style={styles.header}>
           <Pressable
             style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
             onPress={onBack}
           >
             <Ionicons
-              name={isRTL ? "chevron-forward" : "chevron-back"}
+              name="chevron-back"
               size={24}
               color={Colors.text}
             />
@@ -660,7 +660,4 @@ const styles = StyleSheet.create({
   playEventBtn: {
     width: "100%",
   },
-  rowReverse: {
-    flexDirection: "row-reverse",
-  },
-});
+  });

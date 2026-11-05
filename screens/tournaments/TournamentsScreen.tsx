@@ -38,7 +38,7 @@ type Props = {
 
 export default function TournamentsScreen({ onBack, onStartAttempt }: Props) {
   const { user } = useAuth();
-  const { buzz, playSound, isRTL } = useGame();
+  const { buzz, playSound } = useGame();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -106,13 +106,13 @@ export default function TournamentsScreen({ onBack, onStartAttempt }: Props) {
     <ScreenBackground>
       <SafeAreaView style={styles.safeArea}>
         {/* Header */}
-        <View style={[styles.header, isRTL && styles.rowReverse]}>
+        <View style={styles.header}>
           <Pressable
             style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
             onPress={onBack}
           >
             <Ionicons
-              name={isRTL ? "chevron-forward" : "chevron-back"}
+              name="chevron-back"
               size={24}
               color={Colors.text}
             />
@@ -502,7 +502,4 @@ const styles = StyleSheet.create({
     color: Colors.textDim,
     textAlign: "center",
   },
-  rowReverse: {
-    flexDirection: "row-reverse",
-  },
-});
+  });

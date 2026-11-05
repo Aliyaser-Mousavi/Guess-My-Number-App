@@ -1,50 +1,56 @@
-# Welcome to your Expo app 👋
+# MarsGuess 🚀
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+> **MarsGuess** is a feature-packed, server-authoritative competitive numerical strategy mobile game built with **React Native (Expo)** and **Supabase**.
 
-## Get started
+---
 
-1. Install dependencies
+## 🎮 Overview
 
-   ```bash
-   npm install
-   ```
+MarsGuess blends classic number deduction with modern competitive mobile mechanics:
+- **Core Modes**: Oracle (AI Guess), You Guess (Player Guess), Custom Setup, and Pass & Play.
+- **Specialized Arcade Modes**: Time Attack, Survival, Blitz, and Constrained Logic Puzzles.
+- **Online Multiplayer (1v1)**: Real-time skill-based matchmaking, private room codes, and synchronized live battles.
+- **Competitive Seasons & Tournaments**: MMR/CR ratings, seasonal events with soft-resets, weekly Oracle championships with limited attempts.
+- **Number Academy**: Educational curriculum covering search intervals, binary search halving, information entropy, and guided sandboxes.
+- **AI Strategy Coach**: Real-time gameplay analytics, personal efficiency score ($0\text{–}100$), bisection telemetry, and tailored weakness drills.
+- **Cross-Platform & Offline-First**: Optimistic Concurrency Control (OCC) cloud sync with 100% playable offline guest support.
 
-2. Start the app
+---
 
-   ```bash
-   npx expo start
-   ```
+## 🛠️ Tech Stack
 
-In the output, you'll find options to open the app in a
+- **Frontend**: React Native, Expo (SDK 58), Expo Router, React Native Reanimated.
+- **Backend / Database**: Supabase (PostgreSQL), Row Level Security (RLS), Edge Functions, Realtime.
+- **Languages**: TypeScript, PostgreSQL PL/pgSQL.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+---
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## 🚀 Getting Started
 
-## Get a fresh project
-
-When you're ready, run:
-
+### 1. Install Dependencies
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### 2. Configure Environment Variables
+Create a `.env` file in the project root:
+```env
+EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
 
-## Learn more
+### 3. Run the Development Server
+```bash
+npx expo start
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+---
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## 📜 Development Milestones (Groups 01 – 11)
 
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- **Group 01–06**: Core game loops, themes, localization (EN/ES/FR/DE/AR/JA), audio/haptics, accessibility, achievements, and player profiles.
+- **Group 07A–07C**: Game session foundation, optimistic concurrency cloud sync, and server-authoritative ranked pipeline.
+- **Group 08**: Real-time 1v1 multiplayer matchmaking, weekly tournaments, and competitive seasons.
+- **Group 09**: Number Academy interactive strategy curriculum, practice lab, and daily brain training.
+- **Group 10**: AI Strategy Coach engine, tactical efficiency rating, tailored practice generator, and daily logic challenges.
+- **Group 11**: Final QA, full route audit, memory hygiene, and stabilization.

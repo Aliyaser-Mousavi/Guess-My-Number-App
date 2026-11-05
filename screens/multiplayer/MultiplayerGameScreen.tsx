@@ -58,7 +58,7 @@ export default function MultiplayerGameScreen({
   onExit,
 }: Props) {
   const { user } = useAuth();
-  const { buzz, playSound, isRTL } = useGame();
+  const { buzz, playSound } = useGame();
 
   const [guess, setGuess] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -214,7 +214,7 @@ export default function MultiplayerGameScreen({
     <ScreenBackground>
       <SafeAreaView style={styles.safeArea}>
         {/* Top Header */}
-        <View style={[styles.header, isRTL && styles.rowReverse]}>
+        <View style={styles.header}>
           <Pressable
             style={styles.forfeitBtn}
             onPress={() => setShowForfeitModal(true)}
@@ -776,7 +776,4 @@ const styles = StyleSheet.create({
   halfBtn: {
     flex: 1,
   },
-  rowReverse: {
-    flexDirection: "row-reverse",
-  },
-});
+  });

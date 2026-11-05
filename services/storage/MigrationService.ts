@@ -133,15 +133,8 @@ export function validateAndMergeSettings(raw: unknown): Settings {
       ? r.colorBlindMode
       : DEFAULT_SETTINGS.colorBlindMode;
 
-  const language =
-    r.language === "en" || r.language === "fa"
-      ? r.language
-      : DEFAULT_SETTINGS.language;
-
-  const digitFormat =
-    r.digitFormat === "latin" || r.digitFormat === "persian"
-      ? r.digitFormat
-      : DEFAULT_SETTINGS.digitFormat;
+  const language = DEFAULT_SETTINGS.language;
+  const digitFormat = DEFAULT_SETTINGS.digitFormat;
 
   const rawNotifs = (r.notifications && typeof r.notifications === "object"
     ? r.notifications

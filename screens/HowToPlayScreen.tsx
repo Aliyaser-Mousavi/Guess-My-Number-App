@@ -78,7 +78,7 @@ export default function HowToPlayScreen({ onBack }: { onBack: () => void }) {
           </View>
 
           <Text style={styles.subtitle}>
-            Tactical rules and game mechanics for mastering Guess My Number
+            Tactical rules and game mechanics for mastering MarsGuess
           </Text>
 
           {/* Interactive Tutorial Launcher Banner */}

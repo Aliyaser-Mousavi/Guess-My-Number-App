@@ -45,7 +45,7 @@ type Props = {
 };
 
 export default function NumberAcademyScreen({ onBack }: Props) {
-  const { buzz, playSound, isRTL, awardProgressionXp } = useGame();
+  const { buzz, playSound, awardProgressionXp } = useGame();
 
   const [tab, setTab] = useState<AcademyTab>("curriculum");
   const [progress, setProgress] = useState<AcademyProgressState | null>(null);
@@ -281,13 +281,13 @@ export default function NumberAcademyScreen({ onBack }: Props) {
     <ScreenBackground>
       <SafeAreaView style={styles.safeArea}>
         {/* Top Header */}
-        <View style={[styles.header, isRTL && styles.rowReverse]}>
+        <View style={styles.header}>
           <Pressable
             style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
             onPress={onBack}
           >
             <Ionicons
-              name={isRTL ? "chevron-forward" : "chevron-back"}
+              name="chevron-back"
               size={24}
               color={Colors.text}
             />
@@ -1312,7 +1312,4 @@ const styles = StyleSheet.create({
     color: Colors.textDim,
     lineHeight: 16,
   },
-  rowReverse: {
-    flexDirection: "row-reverse",
-  },
-});
+  });

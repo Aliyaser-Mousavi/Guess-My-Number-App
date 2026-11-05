@@ -1,51 +1,49 @@
+import AuthModal from "@/components/auth/AuthModal";
+import LevelUpModal from "@/components/progression/LevelUpModal";
+import Colors from "@/constants/colors";
+import { useAuth } from "@/context/AuthProvider";
+import { useGame } from "@/context/GameProvider";
 import AchievementsScreen from "@/screens/AchievementsScreen";
 import GameOverScreen from "@/screens/GameOverScreen";
 import GameScreen from "@/screens/GameScreen";
 import HomeScreen from "@/screens/HomeScreen";
 import HowToPlayScreen from "@/screens/HowToPlayScreen";
 import LeaderboardScreen from "@/screens/LeaderboardScreen";
-import MultiplayerLobbyScreen, {
-  type MultiplayerGameStartParams,
-} from "@/screens/multiplayer/MultiplayerLobbyScreen";
-import MultiplayerGameScreen from "@/screens/multiplayer/MultiplayerGameScreen";
-import TournamentsScreen from "@/screens/tournaments/TournamentsScreen";
-import SeasonsScreen from "@/screens/seasons/SeasonsScreen";
-import NumberAcademyScreen from "@/screens/academy/NumberAcademyScreen";
-import StrategyCoachScreen from "@/screens/coach/StrategyCoachScreen";
-import { TournamentService, type TournamentInfo } from "@/services/tournament/TournamentService";
-import type { SeasonalEventInfo } from "@/services/seasons/SeasonsService";
 import PlayerGuessScreen from "@/screens/PlayerGuessScreen";
 import ProfileScreen from "@/screens/ProfileScreen";
 import ProgressionScreen from "@/screens/ProgressionScreen";
 import SettingsScreen from "@/screens/SettingsScreen";
-import StartGameScreen, {
-  type SetupConfig,
-} from "@/screens/StartGameScreen";
+import StartGameScreen, { type SetupConfig } from "@/screens/StartGameScreen";
 import StatsScreen from "@/screens/StatsScreen";
+import AboutDeveloperScreen from "@/screens/about/AboutDeveloperScreen";
+import NumberAcademyScreen from "@/screens/academy/NumberAcademyScreen";
+import StrategyCoachScreen from "@/screens/coach/StrategyCoachScreen";
 import BlitzGameScreen from "@/screens/gameModes/BlitzGameScreen";
 import CustomGameScreen from "@/screens/gameModes/CustomGameScreen";
 import LogicPuzzleGameScreen from "@/screens/gameModes/LogicPuzzleGameScreen";
 import PassAndPlayGameScreen from "@/screens/gameModes/PassAndPlayGameScreen";
 import SurvivalGameScreen from "@/screens/gameModes/SurvivalGameScreen";
 import TimeAttackGameScreen from "@/screens/gameModes/TimeAttackGameScreen";
-import LevelUpModal from "@/components/progression/LevelUpModal";
-import AuthModal from "@/components/auth/AuthModal";
-import Colors from "@/constants/colors";
-import { useAuth } from "@/context/AuthProvider";
-import { useGame } from "@/context/GameProvider";
+import MultiplayerGameScreen from "@/screens/multiplayer/MultiplayerGameScreen";
+import MultiplayerLobbyScreen, {
+  type MultiplayerGameStartParams,
+} from "@/screens/multiplayer/MultiplayerLobbyScreen";
+import SeasonsScreen from "@/screens/seasons/SeasonsScreen";
+import TournamentsScreen from "@/screens/tournaments/TournamentsScreen";
+import { TournamentService } from "@/services/tournament/TournamentService";
 import type { AppScreen, GameResult } from "@/types/game";
-import {
-  SpaceGrotesk_400Regular,
-  SpaceGrotesk_500Medium,
-  SpaceGrotesk_600SemiBold,
-  SpaceGrotesk_700Bold,
-} from "@expo-google-fonts/space-grotesk";
 import {
   Inter_400Regular,
   Inter_500Medium,
   Inter_600SemiBold,
   Inter_700Bold,
 } from "@expo-google-fonts/inter";
+import {
+  SpaceGrotesk_400Regular,
+  SpaceGrotesk_500Medium,
+  SpaceGrotesk_600SemiBold,
+  SpaceGrotesk_700Bold,
+} from "@expo-google-fonts/space-grotesk";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
@@ -70,7 +68,8 @@ export default function Index() {
   const [setup, setSetup] = useState<SetupConfig | null>(null);
   const [result, setResult] = useState<GameResult | null>(null);
   const [dailyForced, setDailyForced] = useState(false);
-  const [multiplayerParams, setMultiplayerParams] = useState<MultiplayerGameStartParams | null>(null);
+  const [multiplayerParams, setMultiplayerParams] =
+    useState<MultiplayerGameStartParams | null>(null);
 
   const [fontsLoaded] = useFonts({
     "SpaceGrotesk-Regular": SpaceGrotesk_400Regular,
@@ -81,7 +80,6 @@ export default function Index() {
     "Inter-Medium": Inter_500Medium,
     "Inter-SemiBold": Inter_600SemiBold,
     "Inter-Bold": Inter_700Bold,
-    // Backward-compatibility aliases
     "play-fair": Inter_400Regular,
     "play-fair-bold": SpaceGrotesk_700Bold,
   });
@@ -220,17 +218,11 @@ export default function Index() {
       );
     } else if (setup.mode === "survival") {
       content = (
-        <SurvivalGameScreen
-          onGameOver={handleGameOver}
-          onAbandon={goHome}
-        />
+        <SurvivalGameScreen onGameOver={handleGameOver} onAbandon={goHome} />
       );
     } else if (setup.mode === "blitz") {
       content = (
-        <BlitzGameScreen
-          onGameOver={handleGameOver}
-          onAbandon={goHome}
-        />
+        <BlitzGameScreen onGameOver={handleGameOver} onAbandon={goHome} />
       );
     } else if (setup.mode === "custom" && setup.customConfig) {
       content = (
@@ -323,7 +315,14 @@ export default function Index() {
   } else if (screen === "achievements") {
     content = <AchievementsScreen onBack={() => setScreen("home")} />;
   } else if (screen === "settings") {
-    content = <SettingsScreen onBack={() => setScreen("home")} />;
+    content = (
+      <SettingsScreen
+        onBack={() => setScreen("home")}
+        onOpenAboutDeveloper={() => setScreen("aboutDeveloper")}
+      />
+    );
+  } else if (screen === "aboutDeveloper") {
+    content = <AboutDeveloperScreen onBack={() => setScreen("settings")} />;
   } else if (screen === "howToPlay") {
     content = <HowToPlayScreen onBack={() => setScreen("home")} />;
   } else if (screen === "leaderboard") {

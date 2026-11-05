@@ -12,8 +12,6 @@ import type {
   CoachEvaluationReport,
   IntelligentDailyChallenge,
   PersonalizedRecommendation,
-  StrategyStrengthKey,
-  StrategyWeaknessKey,
   TacticalMetricBreakdown,
   TailoredPracticeChallenge,
 } from "@/types/coach";

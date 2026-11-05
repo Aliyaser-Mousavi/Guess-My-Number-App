@@ -232,7 +232,7 @@ export const COSMETIC_CATALOG: CosmeticItem[] = [
   {
     id: "arcade_legend_title",
     name: "Arcade Sovereign",
-    description: "Peak status for seasoned Guess My Number masters",
+    description: "Peak status for seasoned MarsGuess masters",
     type: "title",
     icon: "trophy",
     requiredLevel: 50,
