@@ -27,4 +27,6 @@ export * from "./matchmaking/MatchmakingService";
 export * from "./multiplayer/MultiplayerService";
 export * from "./tournament/TournamentService";
 export * from "./seasons/SeasonsService";
+export * from "./academy/AcademyService";
+export * from "@/types/academy";
 export * from "@/lib/supabase";

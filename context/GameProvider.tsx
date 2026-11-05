@@ -117,6 +117,7 @@ type GameContextValue = {
   recordSessionGuess: (guess: number, feedback?: GuessFeedback) => void;
   recordSessionHint: () => void;
   abandonSession: () => void;
+  awardProgressionXp: (amount: number) => void;
 
   // Group 06 Additions
   updateProfile: (patch: Partial<PlayerProfile>) => void;
@@ -717,6 +718,28 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const awardProgressionXp = useCallback((amount: number) => {
+    if (amount <= 0) return;
+    setAppState((prev) => {
+      const { next: nextProgression, didLevelUp, levelsGained } =
+        ProgressionService.applyXp(prev.progression, amount);
+
+      if (didLevelUp) {
+        setLevelUpEvent({
+          newLevel: nextProgression.level,
+          levelsGained,
+        });
+      }
+
+      const nextState: AppStateV2 = {
+        ...prev,
+        progression: nextProgression,
+      };
+      StorageService.saveState(nextState).catch(() => {});
+      return nextState;
+    });
+  }, []);
+
   const equipCosmetic = useCallback((item: CosmeticItem) => {
     setAppState((prev) => {
       const { nextCosmetics, nextProfile } = CosmeticsService.equip(
@@ -830,6 +853,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       recordSessionGuess,
       recordSessionHint,
       abandonSession,
+      awardProgressionXp,
       updateProfile,
       setTheme,
       theme,
@@ -863,6 +887,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       recordSessionGuess,
       recordSessionHint,
       abandonSession,
+      awardProgressionXp,
       updateProfile,
       setTheme,
       theme,

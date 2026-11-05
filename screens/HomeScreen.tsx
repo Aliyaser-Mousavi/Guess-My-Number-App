@@ -40,6 +40,7 @@ type Props = {
   onMultiplayer?: () => void;
   onTournaments?: () => void;
   onSeasons?: () => void;
+  onAcademy?: () => void;
   dailyDone: boolean;
 };
 
@@ -56,6 +57,7 @@ export default function HomeScreen({
   onMultiplayer,
   onTournaments,
   onSeasons,
+  onAcademy,
   dailyDone,
 }: Props) {
   const {
@@ -610,6 +612,47 @@ export default function HomeScreen({
                   <Text style={styles.navLabel}>Season 1 Hub</Text>
                   <Text style={styles.navMeta}>
                     Tier Rewards, Soft-Reset & Event Protocols
+                  </Text>
+                </View>
+                <Ionicons
+                  name={LocalizationService.getChevronForward(settings.language)}
+                  size={16}
+                  color={Colors.textDim}
+                />
+              </Pressable>
+            )}
+
+            {/* Number Academy */}
+            {onAcademy && (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.navCard,
+                  isRTL && styles.rowReverse,
+                  pressed && styles.navCardPressed,
+                ]}
+                onPress={() => {
+                  buzz("light");
+                  playSound("button_click");
+                  onAcademy();
+                }}
+              >
+                <View
+                  style={[
+                    styles.navIconContainer,
+                    { backgroundColor: "rgba(0, 210, 180, 0.15)" },
+                  ]}
+                >
+                  <Ionicons name="school" size={20} color={Colors.primary} />
+                </View>
+                <View
+                  style={[
+                    styles.navTextContainer,
+                    isRTL && { alignItems: "flex-end" },
+                  ]}
+                >
+                  <Text style={styles.navLabel}>Number Academy</Text>
+                  <Text style={styles.navMeta}>
+                    Strategy Training, Practice Lab & Daily Brain Drills
                   </Text>
                 </View>
                 <Ionicons
