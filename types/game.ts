@@ -17,7 +17,8 @@ export type AppScreen =
   | "multiplayerGame"
   | "tournaments"
   | "seasons"
-  | "academy";
+  | "academy"
+  | "coach";
 
 // ==========================================
 // 1. Core Gameplay Results

@@ -11,6 +11,7 @@ import MultiplayerGameScreen from "@/screens/multiplayer/MultiplayerGameScreen";
 import TournamentsScreen from "@/screens/tournaments/TournamentsScreen";
 import SeasonsScreen from "@/screens/seasons/SeasonsScreen";
 import NumberAcademyScreen from "@/screens/academy/NumberAcademyScreen";
+import StrategyCoachScreen from "@/screens/coach/StrategyCoachScreen";
 import { TournamentService, type TournamentInfo } from "@/services/tournament/TournamentService";
 import type { SeasonalEventInfo } from "@/services/seasons/SeasonsService";
 import PlayerGuessScreen from "@/screens/PlayerGuessScreen";
@@ -196,6 +197,7 @@ export default function Index() {
         onTournaments={() => setScreen("tournaments")}
         onSeasons={() => setScreen("seasons")}
         onAcademy={() => setScreen("academy")}
+        onCoach={() => setScreen("coach")}
       />
     );
   } else if (screen === "setup") {
@@ -379,6 +381,13 @@ export default function Index() {
     );
   } else if (screen === "academy") {
     content = <NumberAcademyScreen onBack={() => setScreen("home")} />;
+  } else if (screen === "coach") {
+    content = (
+      <StrategyCoachScreen
+        onBack={() => setScreen("home")}
+        onNavigateToAcademy={() => setScreen("academy")}
+      />
+    );
   }
 
   return (
