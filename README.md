@@ -43,14 +43,3 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```bash
 npx expo start
 ```
-
----
-
-## 📜 Development Milestones (Groups 01 – 11)
-
-- **Group 01–06**: Core game loops, themes, localization (EN/ES/FR/DE/AR/JA), audio/haptics, accessibility, achievements, and player profiles.
-- **Group 07A–07C**: Game session foundation, optimistic concurrency cloud sync, and server-authoritative ranked pipeline.
-- **Group 08**: Real-time 1v1 multiplayer matchmaking, weekly tournaments, and competitive seasons.
-- **Group 09**: Number Academy interactive strategy curriculum, practice lab, and daily brain training.
-- **Group 10**: AI Strategy Coach engine, tactical efficiency rating, tailored practice generator, and daily logic challenges.
-- **Group 11**: Final QA, full route audit, memory hygiene, and stabilization.
